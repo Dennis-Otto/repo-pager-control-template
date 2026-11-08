@@ -1,0 +1,17 @@
+# The hosts that the job of Claude (.github/workflows/ask.yml) may reach on GitHub's
+# egress-firewall runner (runs-on: ubuntu-24.04-firewall); GitHub blocks all others,
+# apart from its own defaults (github.com, codeload.github.com and the endpoints of
+# Actions, which the artifacts and the checkout use). Add a host only when a step
+# needs it, name it in full and say what uses it.
+mode: enforce
+allow:
+  # GitHub API: the Claude Code action asks for the actor of the run
+  - api.github.com
+  # npm: the packages of the Claude Code action, which Bun installs
+  - registry.npmjs.org
+  # Anthropic: the API of Claude, and Claude Code, which the action installs
+  - api.anthropic.com
+  - claude.ai
+  - downloads.claude.ai
+  # GitHub's releases: Bun, which the action installs
+  - release-assets.githubusercontent.com

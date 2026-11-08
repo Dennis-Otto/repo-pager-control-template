@@ -1,0 +1,35 @@
+name: Agents
+
+# The questions and reports of the maintainer's own agents, such as an orchestrator
+# on their PC, which send them with gh (scripts/ask.mjs), and the end of a question that an
+# agent no longer needs: this workflow checks each event and forwards it to
+# /control of the pager's Worker, signed. Only an event that the owner of this
+# repository sent goes on; one of the pager's GitHub App, or of anyone else who may
+# write here, fails the run. No Claude runs here, and the pager saves the answer to
+# a question on the branch pager-answers. README.md describes the way.
+
+on:
+  repository_dispatch:
+    types: [pager-ask, pager-withdraw, pager-report]
+
+permissions: {}
+
+jobs:
+  forward:
+    name: Forward to the pager
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Check the event and send it to the pager, signed
+        env:
+          PAGER_URL: ${{ vars.PAGER_URL }}
+          PAGER_CONTROL_SECRET: ${{ secrets.PAGER_CONTROL_SECRET }}
+        run: node pager/job.mjs forward

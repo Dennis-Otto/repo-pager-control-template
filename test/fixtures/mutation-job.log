@@ -1,0 +1,500 @@
+﻿2026-11-05T09:03:31.8028242Z Current runner version: '2.338.2'
+2026-11-05T09:03:31.8048480Z ##[group]Runner Image Provisioner
+2026-11-05T09:03:31.8049303Z Hosted Compute Agent
+2026-11-05T09:03:31.8049813Z Version: 20261021.618
+2026-11-05T09:03:55.2054769Z ##[group]Run composer install --no-interaction --prefer-dist --no-progress
+2026-11-05T09:03:55.2055211Z [36;1mcomposer install --no-interaction --prefer-dist --no-progress[0m
+2026-11-05T09:03:55.2056015Z [36;1mcurl --fail --location --silent --show-error --retry 5 --retry-all-errors \[0m
+2026-11-05T09:03:55.2056478Z [36;1m  --connect-timeout 15 --max-time 300 --output "$RUNNER_TEMP/infection.phar" \[0m
+2026-11-05T09:03:55.2056981Z [36;1m  "https://github.com/infection/infection/releases/download/$INFECTION_VERSION/infection.phar"[0m
+2026-11-05T09:03:55.2057493Z [36;1mecho "$INFECTION_SHA256  $RUNNER_TEMP/infection.phar" | sha256sum --check --strict[0m
+2026-11-05T09:03:55.2077153Z shell: /usr/bin/bash -e {0}
+2026-11-05T09:03:55.2077365Z env:
+2026-11-05T09:03:55.2077918Z   GH_TELEMETRY: false
+2026-11-05T09:03:55.2078190Z   INFECTION_VERSION: 0.35.8
+2026-11-05T09:03:55.2078729Z   INFECTION_SHA256: b2049ae1bff43d9dc82831c2833005005eb62d5180cd518892af93fc8e23ddc5
+2026-11-05T09:03:55.2079097Z   MUTMUT_LIMIT: 320m
+2026-11-05T09:03:55.2079283Z   COMPOSER_PROCESS_TIMEOUT: 0
+2026-11-05T09:03:55.2079483Z   COMPOSER_NO_INTERACTION: 1
+2026-11-05T09:03:55.2079674Z   COMPOSER_NO_AUDIT: 1
+2026-11-05T09:03:55.2079852Z ##[endgroup]
+2026-11-05T09:03:55.3416970Z Installing dependencies from lock file (including require-dev)
+2026-11-05T09:03:55.3446461Z Verifying lock file contents can be installed on current platform.
+2026-11-05T09:03:55.4287807Z Package operations: 77 installs, 0 updates, 0 removals
+2026-11-05T09:03:55.4294957Z   - Downloading revolt/event-loop (v1.0.9)
+2026-11-05T09:03:59.2598211Z   - Installing sebastian/global-state (8.0.3): Extracting archive
+2026-11-05T09:03:59.2598918Z   - Installing sebastian/exporter (7.0.3): Extracting archive
+2026-11-05T09:03:59.2599648Z   - Installing sebastian/environment (8.1.2): Extracting archive
+2026-11-05T09:03:59.2600333Z   - Installing sebastian/diff (7.0.1): Extracting archive
+2026-11-05T09:03:59.2601427Z   - Installing sebastian/comparator (7.1.8): Extracting archive
+2026-11-05T09:03:59.2603930Z   - Installing sebastian/cli-parser (4.2.1): Extracting archive
+2026-11-05T09:03:59.2606486Z   - Installing phpunit/php-timer (8.0.0): Extracting archive
+2026-11-05T09:03:59.2609084Z   - Installing phpunit/php-text-template (5.0.1): Extracting archive
+2026-11-05T09:03:59.2611721Z   - Installing phpunit/php-invoker (6.0.0): Extracting archive
+2026-11-05T09:03:59.2615823Z   - Installing phpunit/php-file-iterator (6.0.2): Extracting archive
+2026-11-05T09:03:59.2624145Z   - Installing theseer/tokenizer (2.0.1): Extracting archive
+2026-11-05T09:03:59.2625036Z   - Installing nikic/php-parser (v5.9.0): Extracting archive
+2026-11-05T09:03:59.2626675Z   - Installing sebastian/lines-of-code (4.0.1): Extracting archive
+2026-11-05T09:03:59.2627224Z   - Installing sebastian/complexity (5.0.0): Extracting archive
+2026-11-05T09:03:59.2627996Z   - Installing phpunit/php-code-coverage (12.5.8): Extracting archive
+2026-11-05T09:03:59.2638921Z   - Installing phar-io/version (3.2.1): Extracting archive
+2026-11-05T09:03:59.2639651Z   - Installing phar-io/manifest (2.0.4): Extracting archive
+2026-11-05T09:03:59.2640522Z   - Installing myclabs/deep-copy (1.14.0): Extracting archive
+2026-11-05T09:03:59.2641113Z   - Installing phpunit/phpunit (12.5.43): Extracting archive
+2026-11-05T09:03:59.2641699Z   - Installing symfony/deprecation-contracts (v3.7.1): Extracting archive
+2026-11-05T09:03:59.2642329Z   - Installing symfony/service-contracts (v3.7.3): Extracting archive
+2026-11-05T09:03:59.2644656Z   - Installing symfony/polyfill-intl-normalizer (v1.43.0): Extracting archive
+2026-11-05T09:03:59.2646820Z   - Installing symfony/polyfill-intl-grapheme (v1.43.3): Extracting archive
+2026-11-05T09:03:59.2650071Z   - Installing symfony/string (v7.4.22): Extracting archive
+2026-11-05T09:03:59.2652427Z   - Installing symfony/polyfill-php84 (v1.43.0): Extracting archive
+2026-11-05T09:03:59.2655530Z   - Installing symfony/filesystem (v7.4.23): Extracting archive
+2026-11-05T09:03:59.2658043Z   - Installing symfony/console (v7.4.22): Extracting archive
+2026-11-05T09:03:59.2660708Z   - Installing spatie/array-to-xml (3.4.4): Extracting archive
+2026-11-05T09:03:59.2662686Z   - Installing netresearch/jsonmapper (v5.0.1): Extracting archive
+2026-11-05T09:03:59.2664563Z   - Installing fidry/cpu-core-counter (1.4.1): Extracting archive
+2026-11-05T09:03:59.2667070Z   - Installing felixfbecker/language-server-protocol (v1.5.3): Extracting archive
+2026-11-05T09:03:59.2669095Z   - Installing dnoegel/php-xdg-base-dir (v0.1.1): Extracting archive
+2026-11-05T09:03:59.2671157Z   - Installing danog/advanced-json-rpc (v3.2.3): Extracting archive
+2026-11-05T09:03:59.2673189Z   - Installing composer/xdebug-handler (3.0.5): Extracting archive
+2026-11-05T09:03:59.2675031Z   - Installing composer/semver (3.6.0): Extracting archive
+2026-11-05T09:03:59.2677543Z   - Installing amphp/parallel (v2.4.0): Extracting archive
+2026-11-05T09:03:59.2679464Z   - Installing vimeo/psalm (6.20.6): Extracting archive
+2026-11-05T09:04:00.5685510Z Generating autoload files
+2026-11-05T09:04:00.7305959Z 53 packages you are using are looking for funding.
+2026-11-05T09:04:00.7306476Z Use the `composer fund` command to find out more!
+2026-11-05T09:04:11.9241699Z curl: (22) The requested URL returned error: 504
+2026-11-05T09:04:12.9769707Z curl: (22) The requested URL returned error: 504
+2026-11-05T09:04:15.0316356Z curl: (22) The requested URL returned error: 504
+2026-11-05T09:04:19.0879673Z curl: (22) The requested URL returned error: 504
+2026-11-05T09:04:27.1474354Z curl: (22) The requested URL returned error: 504
+2026-11-05T09:04:43.2158092Z curl: (22) The requested URL returned error: 504
+2026-11-05T09:04:43.2196481Z ##[error]Process completed with exit code 22.
+2026-11-05T09:04:43.2245399Z ##[group]Run # "40 mutations were generated:", in the output of Infection with any configuration.
+2026-11-05T09:04:43.2246037Z [36;1m# "40 mutations were generated:", in the output of Infection with any configuration.[0m
+2026-11-05T09:04:43.2246618Z [36;1mgenerated="$(sed -nE '/^ *[0-9]+ mutations were generated/{s/^ *([0-9]+).*/\1/p;q;}' build/infection-output.log 2>/dev/null || true)"[0m
+2026-11-05T09:04:43.2247065Z [36;1mscored=false[0m
+2026-11-05T09:04:43.2247382Z [36;1mif ((${generated:-0} > 0)) && grep -qs 'Covered Code MSI' build/infection-output.log; then[0m
+2026-11-05T09:04:43.2247738Z [36;1m  scored=true[0m
+2026-11-05T09:04:43.2247924Z [36;1mfi[0m
+2026-11-05T09:04:43.2248080Z [36;1m{[0m
+2026-11-05T09:04:43.2248265Z [36;1m  echo "### Mutation tests (Infection)"[0m
+2026-11-05T09:04:43.2248512Z [36;1m  if [[ "$scored" == true ]]; then[0m
+2026-11-05T09:04:43.2248956Z [36;1m    grep -E '(Mutation Score Indicator|Mutation Code Coverage|Covered Code MSI)' build/infection-output.log \[0m
+2026-11-05T09:04:43.2249435Z [36;1m      | sed 's/^ */- /'[0m
+2026-11-05T09:04:43.2249631Z [36;1m  else[0m
+2026-11-05T09:04:43.2249863Z [36;1m    echo "Infection reported no score. The end of its output:"[0m
+2026-11-05T09:04:43.2250140Z [36;1m    echo[0m
+2026-11-05T09:04:43.2250312Z [36;1m    echo '```text'[0m
+2026-11-05T09:04:43.2250569Z [36;1m    tail -n 20 build/infection-output.log 2>/dev/null || true[0m
+2026-11-05T09:04:43.2250855Z [36;1m    echo '```'[0m
+2026-11-05T09:04:43.2251036Z [36;1m  fi[0m
+2026-11-05T09:04:43.2251243Z [36;1m  if [[ -f build/infection-summary.log ]]; then[0m
+2026-11-05T09:04:43.2251488Z [36;1m    echo[0m
+2026-11-05T09:04:43.2251652Z [36;1m    echo '```text'[0m
+2026-11-05T09:04:43.2251857Z [36;1m    cat build/infection-summary.log[0m
+2026-11-05T09:04:43.2252081Z [36;1m    echo '```'[0m
+2026-11-05T09:04:43.2252255Z [36;1m  fi[0m
+2026-11-05T09:04:43.2252431Z [36;1m} >> "$GITHUB_STEP_SUMMARY"[0m
+2026-11-05T09:04:43.2252753Z [36;1m# A run that measures nothing, not a low score, fails: no mutant, such as of a[0m
+2026-11-05T09:04:43.2253172Z [36;1m# configuration whose code is missing, or no score that it could read.[0m
+2026-11-05T09:04:43.2253481Z [36;1mif [[ "$scored" != true ]]; then[0m
+2026-11-05T09:04:43.2253695Z [36;1m  exit 1[0m
+2026-11-05T09:04:43.2253858Z [36;1mfi[0m
+2026-11-05T09:04:43.2271754Z shell: /usr/bin/bash -e {0}
+2026-11-05T09:04:43.2271952Z env:
+2026-11-05T09:04:43.2272117Z   GH_TELEMETRY: false
+2026-11-05T09:04:43.2272307Z   INFECTION_VERSION: 0.35.8
+2026-11-05T09:04:43.2272620Z   INFECTION_SHA256: b2049ae1bff43d9dc82831c2833005005eb62d5180cd518892af93fc8e23ddc5
+2026-11-05T09:04:43.2272954Z   MUTMUT_LIMIT: 320m
+2026-11-05T09:04:43.2273152Z   COMPOSER_PROCESS_TIMEOUT: 0
+2026-11-05T09:04:43.2273363Z   COMPOSER_NO_INTERACTION: 1
+2026-11-05T09:04:43.2273555Z   COMPOSER_NO_AUDIT: 1
+2026-11-05T09:04:43.2273737Z ##[endgroup]
+2026-11-05T09:04:43.2354017Z ##[error]Process completed with exit code 1.
+2026-11-05T09:04:43.2441804Z ##[group]Run actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+2026-11-05T09:04:43.2442116Z with:
+2026-11-05T09:04:43.2442273Z   name: mutation
+2026-11-05T09:04:43.2442447Z   path: build/infection*.log
+2026-11-05T09:04:43.2442639Z   retention-days: 30
+2026-11-05T09:04:43.2442823Z   if-no-files-found: ignore
+2026-11-05T09:04:43.2443013Z   compression-level: 6
+2026-11-05T09:04:43.2443191Z   overwrite: false
+2026-11-05T09:04:43.2443363Z   include-hidden-files: false
+2026-11-05T09:04:43.2443555Z   archive: true
+2026-11-05T09:04:43.2443887Z env:
+2026-11-05T09:04:43.2444043Z   GH_TELEMETRY: false
+2026-11-05T09:04:43.2444234Z   INFECTION_VERSION: 0.35.8
+2026-11-05T09:04:43.2444545Z   INFECTION_SHA256: b2049ae1bff43d9dc82831c2833005005eb62d5180cd518892af93fc8e23ddc5
+2026-11-05T09:04:43.2444871Z   MUTMUT_LIMIT: 320m
+2026-11-05T09:04:43.2445057Z   COMPOSER_PROCESS_TIMEOUT: 0
+2026-11-05T09:04:43.2445394Z   COMPOSER_NO_INTERACTION: 1
+2026-11-05T09:04:43.2445698Z   COMPOSER_NO_AUDIT: 1
+2026-11-05T09:04:43.2445920Z ##[endgroup]
+2026-11-05T09:04:43.3632316Z No files were found with the provided path: build/infection*.log. No artifacts will be uploaded.
+2026-11-05T09:04:43.3833064Z Post job cleanup.
+2026-11-05T09:04:43.4556950Z [command]/usr/bin/git version
+2026-11-05T09:04:43.4605209Z git version 2.56.0
+2026-11-05T09:04:43.4638743Z Temporarily overriding HOME='/home/runner/work/_temp/298a4204-5b1c-4f90-8aee-4c63e1c28169' before making global git config changes
+2026-11-05T09:04:43.4640255Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-05T09:04:43.4643133Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/demo/demo
+2026-11-05T09:04:43.4676582Z Removing SSH command configuration
+2026-11-05T09:04:43.4683360Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-05T09:04:43.4720589Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-05T09:04:43.4963604Z Removing HTTP extra header
+2026-11-05T09:04:43.4969467Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-05T09:04:43.5006704Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-05T09:04:43.5286341Z Removing includeIf entries pointing to credentials config files
+2026-11-05T09:04:43.5287215Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-05T09:04:43.5337367Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-05T09:04:43.5732038Z Post job cleanup.
+2026-11-05T09:04:43.6331631Z [harden-runner] post-step
+2026-11-05T09:04:44.6357276Z log:
+2026-11-05T09:04:44.6357937Z Thu, 05 Nov 2026 09:03:47 GMT:[buildInfo] tag=v0.18.0 commit=7bfa6297a2bacca7a0844515ebf5a7ef90764d98 branch=HEAD 
+2026-11-05T09:04:44.6358478Z 
+2026-11-05T09:04:44.6358601Z Thu, 05 Nov 2026 09:03:47 GMT:read config 
+2026-11-05T09:04:44.6360316Z  &{Repo:octocat/demo CorrelationId:00000000-0000-0000-0000-000000000000 RunId:1 WorkingDirectory:/home/runner/work/demo/demo APIURL:https://agent.api.stepsecurity.io/v1 TelemetryURL:https://prod.app-api.stepsecurity.io/v1 OneTimeKey: Endpoints:map[] EgressPolicy:audit DisableTelemetry:false DisableSudo:false DisableSudoAndContainers:false DisableFileMonitoring:false Private:false}
+2026-11-05T09:04:44.6361546Z 
+2026-11-05T09:04:44.6361760Z Thu, 05 Nov 2026 09:03:47 GMT:Step Security Job Correlation ID: 00000000-0000-0000-0000-000000000000
+2026-11-05T09:04:44.6362079Z 
+2026-11-05T09:04:44.6362535Z Thu, 05 Nov 2026 09:03:47 GMT:Global feature flags: {AgentType:agent-oss EnableArmour:true EnableCustomDetectionRules:true DisableKillEnforcement:false RevertGithubDNSExperiment:true}
+2026-11-05T09:04:44.6363162Z Thu, 05 Nov 2026 09:03:47 GMT:initialized global feature flags
+2026-11-05T09:04:44.6363345Z 
+2026-11-05T09:04:44.6363481Z Thu, 05 Nov 2026 09:03:47 GMT:[github-dns-experiment] not detected
+2026-11-05T09:04:44.6370381Z Thu, 05 Nov 2026 09:03:47 GMT:initialized global blocklist: &{ipAddresses:map[139.84.223.178:COMPROMISED_MEMTENSOR_MEMOS_SUPPLYCHAIN_LOCAL_WORM 142.11.206.73:COMPROMISED_AXIOS_C2_IP 193.32.204.199:GHOSTACTION_GITHUB_ACTIONS_CREDENTIAL_THEFT 216.126.225.129:MEGALODON_EXFIL_IP 23.254.164.123:COMPROMISED_MASTRA_C2_DOMAIN 23.254.164.92:COMPROMISED_MASTRA_C2_DOMAIN 23.254.165.112:COMPROMISED_ARRAYREF_C2_IP 37.27.122.124:COMPROMISED_JSCRAMBLER_C2_IP 57.128.246.79:COMPROMISED_JSCRAMBLER_C2_IP 83.142.209.194:COMPROMISED_MISTRAL_PYPI_C2_IP 85.137.53.71:COMPROMISED_ASYNCAPI_GENERATOR_MIASMA_RAT_C2] domains:map[api.masscan.cloud.:COMPROMISED_TANSTACK_EXFIL archive.torproject.org.:COMPROMISED_JSCRAMBLER_C2_DOMAIN audit.checkmarx.cx.:COMPROMISED_BITWARDEN_CLI_C2_DOMAIN check.git-service.com.:COMPROMISED_DURABLETASK_C2_DOMAIN check.torproject.org.:COMPROMISED_JSCRAMBLER_C2_DOMAIN ci-artifacts.dev.:SUBQL_CREDENTIAL_THEFT_C2 cjn37-uyaaa-aaaac-qgnva-cai.raw.icp0.io.:COMPROMISED_PGSERVE_EXFIL_CANISTER dht.transmissionbt.com.:COMPROMISED_ASYNCAPI_GENERATOR_MIASMA_RAT_C2 evil.invalid.:GLOBAL_BLOCK_TEST_DOMAIN filev2.getsession.org.:COMPROMISED_TANSTACK_EXFIL flipboxstudio.info.:COMPROMISED_PACKAGIST_C2_DOMAIN git-tanstack.com.:COMPROMISED_TANSTACK_EXFIL igotnofriendsonlineorirl-imgonnakmslmao.skyhanni.cloud.:COMPROMISED_ELEMENTARY_DATA_EXFIL iseekaigogo.com.:COMPROMISED_TENSORLAKE_NPM_C2 js-mirror.com.:COMPROMISED_CHAINDROP_NPM_EXFIL litellm.dev.:COMPROMISED_LITELLM_EXFIL_DOMAIN metrics.femboy.energy.:COMPROMISED_MRMUSTARD_PYPI_C2_DOMAIN npm-cache.com.:COMPROMISED_CHAINDROP_NPM_EXFIL pypi-get.com.:COMPROMISED_CHAINDROP_NPM_EXFIL relay.damus.io.:COMPROMISED_ASYNCAPI_GENERATOR_MIASMA_RAT_C2 relay.nostr.com.:COMPROMISED_ASYNCAPI_GENERATOR_MIASMA_RAT_C2 router.bittorrent.com.:COMPROMISED_ASYNCAPI_GENERATOR_MIASMA_RAT_C2 scan.aquasecurtiy.org.:COMPROMISED_TRIVY_C2_DOMAIN seed1.getsession.org.:COMPROMISED_TANSTACK_EXFIL sfrclak.com.:COMPROMISED_AXIOS_C2_DOMAIN sh.azurestaticprovider.net.:COMPROMISED_NODE_IPC_NPM_C2 skyleen.fr.:COMPROMISED_MEMTENSOR_MEMOS_SUPPLYCHAIN_LOCAL_WORM t.m-kosche.com.:COMPROMISED_ACTIONSCOOL_EXFIL telemetry.api-monitor.com.:COMPROMISED_PGSERVE_EXFIL_DOMAIN whereisitat.lucyatemysuperbox.space.:COMPROMISED_XINFERENCE_C2_DOMAIN www.litellm.dev.:COMPROMISED_LITELLM_EXFIL_DOMAIN_2 zero.masscan.cloud.:COMPROMISED_MINI_SHAI_HULUD_2] wildcardDomains:map[skyleen.fr.:COMPROMISED_MEMTENSOR_MEMOS_SUPPLYCHAIN_LOCAL_WORM]}
+2026-11-05T09:04:44.6377482Z 
+2026-11-05T09:04:44.6407401Z Thu, 05 Nov 2026 09:03:47 GMT:fetched GitHub meta domains: [{domainName:github.com. port:443} {domainName:*.github.com. port:443} {domainName:*.githubapp.com. port:443} {domainName:ghcr.io. port:443} {domainName:productionresultssa0.blob.core.windows.net. port:443} {domainName:productionresultssa1.blob.core.windows.net. port:443} {domainName:productionresultssa2.blob.core.windows.net. port:443} {domainName:productionresultssa3.blob.core.windows.net. port:443} {domainName:productionresultssa4.blob.core.windows.net. port:443} {domainName:productionresultssa5.blob.core.windows.net. port:443} {domainName:productionresultssa6.blob.core.windows.net. port:443} {domainName:productionresultssa7.blob.core.windows.net. port:443} {domainName:productionresultssa8.blob.core.windows.net. port:443} {domainName:productionresultssa9.blob.core.windows.net. port:443} {domainName:productionresultssa10.blob.core.windows.net. port:443} {domainName:productionresultssa11.blob.core.windows.net. port:443} {domainName:productionresultssa12.blob.core.windows.net. port:443} {domainName:productionresultssa13.blob.core.windows.net. port:443} {domainName:productionresultssa14.blob.core.windows.net. port:443} {domainName:productionresultssa15.blob.core.windows.net. port:443} {domainName:productionresultssa16.blob.core.windows.net. port:443} {domainName:productionresultssa17.blob.core.windows.net. port:443} {domainName:productionresultssa18.blob.core.windows.net. port:443} {domainName:productionresultssa19.blob.core.windows.net. port:443} {domainName:productionresultssa30.blob.core.windows.net. port:443} {domainName:productionresultssa31.blob.core.windows.net. port:443} {domainName:productionresultssa32.blob.core.windows.net. port:443} {domainName:productionresultssa33.blob.core.windows.net. port:443} {domainName:productionresultssa34.blob.core.windows.net. port:443} {domainName:productionresultssa35.blob.core.windows.net. port:443} {domainName:productionresultssa36.blob.core.windows.net. port:443} {domainName:productionresultssa37.blob.core.windows.net. port:443} {domainName:productionresultssa38.blob.core.windows.net. port:443} {domainName:productionresultssa39.blob.core.windows.net. port:443} {domainName:productionresultssa40.blob.core.windows.net. port:443} {domainName:productionresultssa41.blob.core.windows.net. port:443} {domainName:productionresultssa42.blob.core.windows.net. port:443} {domainName:productionresultssa43.blob.core.windows.net. port:443} {domainName:productionresultssa44.blob.core.windows.net. port:443} {domainName:productionresultssa45.blob.core.windows.net. port:443} {domainName:productionresultssa46.blob.core.windows.net. port:443} {domainName:productionresultssa47.blob.core.windows.net. port:443} {domainName:productionresultssa48.blob.core.windows.net. port:443} {domainName:productionresultssa49.blob.core.windows.net. port:443} {domainName:productionresultssa100.blob.core.windows.net. port:443} {domainName:productionresultssa101.blob.core.windows.net. port:443} {domainName:productionresultssa102.blob.core.windows.net. port:443} {domainName:productionresultssa103.blob.core.windows.net. port:443} {domainName:productionresultssa104.blob.core.windows.net. port:443} {domainName:productionresultssa105.blob.core.windows.net. port:443} {domainName:productionresultssa106.blob.core.windows.net. port:443} {domainName:productionresultssa107.blob.core.windows.net. port:443} {domainName:productionresultssa108.blob.core.windows.net. port:443} {domainName:productionresultssa109.blob.core.windows.net. port:443} {domainName:productionresultssa110.blob.core.windows.net. port:443} {domainName:productionresultssa111.blob.core.windows.net. port:443} {domainName:productionresultssa112.blob.core.windows.net. port:443} {domainName:productionresultssa113.blob.core.windows.net. port:443} {domainName:productionresultssa114.blob.core.windows.net. port:443} {domainName:productionresultssa115.blob.core.windows.net. port:443} {domainName:productionresultssa116.blob.core.windows.net. port:443} {domainName:productionresultssa117.blob.core.windows.net. port:443} {domainName:productionresultssa118.blob.core.windows.net. port:443} {domainName:productionresultssa119.blob.core.windows.net. port:443} {domainName:productionresultssa120.blob.core.windows.net. port:443} {domainName:productionresultssa121.blob.core.windows.net. port:443} {domainName:productionresultssa122.blob.core.windows.net. port:443} {domainName:productionresultssa123.blob.core.windows.net. port:443} {domainName:productionresultssa124.blob.core.windows.net. port:443} {domainName:productionresultssa125.blob.core.windows.net. port:443} {domainName:productionresultssa126.blob.core.windows.net. port:443} {domainName:productionresultssa127.blob.core.windows.net. port:443} {domainName:productionresultssa128.blob.core.windows.net. port:443} {domainName:productionresultssa129.blob.core.windows.net. port:443} {domainName:productionresultssa130.blob.core.windows.net. port:443} {domainName:productionresultssa131.blob.core.windows.net. port:443} {domainName:productionresultssa132.blob.core.windows.net. port:443} {domainName:productionresultssa133.blob.core.windows.net. port:443} {domainName:productionresultssa134.blob.core.windows.net. port:443} {domainName:productionresultssa135.blob.core.windows.net. port:443} {domainName:productionresultssa136.blob.core.windows.net. port:443} {domainName:productionresultssa137.blob.core.windows.net. port:443} {domainName:productionresultssa138.blob.core.windows.net. port:443} {domainName:productionresultssa139.blob.core.windows.net. port:443} {domainName:productionresultssa140.blob.core.windows.net. port:443} {domainName:productionresultssa141.blob.core.windows.net. port:443} {domainName:productionresultssa142.blob.core.windows.net. port:443} {domainName:productionresultssa143.blob.core.windows.net. port:443} {domainName:productionresultssa144.blob.core.windows.net. port:443} {domainName:productionresultssa145.blob.core.windows.net. port:443} {domainName:productionresultssa146.blob.core.windows.net. port:443} {domainName:productionresultssa147.blob.core.windows.net. port:443} {domainName:productionresultssa148.blob.core.windows.net. port:443} {domainName:productionresultssa149.blob.core.windows.net. port:443} {domainName:productionresultssa150.blob.core.windows.net. port:443} {domainName:productionresultssa151.blob.core.windows.net. port:443} {domainName:productionresultssa152.blob.core.windows.net. port:443} {domainName:productionresultssa153.blob.core.windows.net. port:443} {domainName:productionresultssa154.blob.core.windows.net. port:443} {domainName:productionresultssa155.blob.core.windows.net. port:443} {domainName:productionresultssa156.blob.core.windows.net. port:443} {domainName:productionresultssa157.blob.core.windows.net. port:443} {domainName:productionresultssa158.blob.core.windows.net. port:443} {domainName:productionresultssa159.blob.core.windows.net. port:443} {domainName:productionresultssa160.blob.core.windows.net. port:443} {domainName:productionresultssa161.blob.core.windows.net. port:443} {domainName:productionresultssa162.blob.core.windows.net. port:443} {domainName:productionresultssa163.blob.core.windows.net. port:443} {domainName:productionresultssa164.blob.core.windows.net. port:443} {domainName:productionresultssa165.blob.core.windows.net. port:443} {domainName:productionresultssa166.blob.core.windows.net. port:443} {domainName:productionresultssa167.blob.core.windows.net. port:443} {domainName:productionresultssa168.blob.core.windows.net. port:443} {domainName:productionresultssa169.blob.core.windows.net. port:443} {domainName:productionresultssa170.blob.core.windows.net. port:443} {domainName:productionresultssa171.blob.core.windows.net. port:443} {domainName:productionresultssa172.blob.core.windows.net. port:443} {domainName:productionresultssa173.blob.core.windows.net. port:443} {domainName:productionresultssa174.blob.core.windows.net. port:443} {domainName:productionresultssa175.blob.core.windows.net. port:443} {domainName:productionresultssa176.blob.core.windows.net. port:443} {domainName:productionresultssa177.blob.core.windows.net. port:443} {domainName:productionresultssa178.blob.core.windows.net. port:443} {domainName:productionresultssa179.blob.core.windows.net. port:443} {domainName:productionresultssa180.blob.core.windows.net. port:443} {domainName:productionresultssa181.blob.core.windows.net. port:443} {domainName:productionresultssa182.blob.core.windows.net. port:443} {domainName:productionresultssa183.blob.core.windows.net. port:443} {domainName:productionresultssa184.blob.core.windows.net. port:443} {domainName:productionresultssa185.blob.core.windows.net. port:443} {domainName:productionresultssa186.blob.core.windows.net. port:443} {domainName:productionresultssa187.blob.core.windows.net. port:443} {domainName:productionresultssa188.blob.core.windows.net. port:443} {domainName:productionresultssa189.blob.core.windows.net. port:443} {domainName:productionresultssa190.blob.core.windows.net. port:443} {domainName:productionresultssa191.blob.core.windows.net. port:443} {domainName:productionresultssa192.blob.core.windows.net. port:443} {domainName:productionresultssa193.blob.core.windows.net. port:443} {domainName:productionresultssa194.blob.core.windows.net. port:443} {domainName:productionresultssa195.blob.core.windows.net. port:443} {domainName:productionresultssa196.blob.core.windows.net. port:443} {domainName:productionresultssa197.blob.core.windows.net. port:443} {domainName:productionresultssa198.blob.core.windows.net. port:443} {domainName:productionresultssa199.blob.core.windows.net. port:443}]
+2026-11-05T09:04:44.6437454Z 
+2026-11-05T09:04:44.6437593Z Thu, 05 Nov 2026 09:03:47 GMT:started process monitor
+2026-11-05T09:04:44.6437777Z 
+2026-11-05T09:04:44.6437891Z Thu, 05 Nov 2026 09:03:47 GMT:Monitor Processes called
+2026-11-05T09:04:44.6438161Z Thu, 05 Nov 2026 09:03:47 GMT:NewAuditClient created
+2026-11-05T09:04:44.6438600Z Thu, 05 Nov 2026 09:03:47 GMT:Status is enabled
+2026-11-05T09:04:44.6438833Z Thu, 05 Nov 2026 09:03:47 GMT:Rules deleted
+2026-11-05T09:04:44.6439193Z Thu, 05 Nov 2026 09:03:47 GMT:File monitor added for /home/runner/work/demo/demo
+2026-11-05T09:04:44.6439566Z Thu, 05 Nov 2026 09:03:47 GMT:Agent file monitor added
+2026-11-05T09:04:44.6439855Z Thu, 05 Nov 2026 09:03:47 GMT:Docker's daemon.json file monitor added
+2026-11-05T09:04:44.6440177Z Thu, 05 Nov 2026 09:03:47 GMT:Systemd's resolved.conf file monitor added
+2026-11-05T09:04:44.6440493Z Thu, 05 Nov 2026 09:03:47 GMT:Net monitor added for TCP (connect)
+2026-11-05T09:04:44.6440809Z Thu, 05 Nov 2026 09:03:47 GMT:Net monitor added for UDP (sendto & sendmsg)
+2026-11-05T09:04:44.6441108Z Thu, 05 Nov 2026 09:03:47 GMT:Process monitor added
+2026-11-05T09:04:44.6441350Z Thu, 05 Nov 2026 09:03:47 GMT:receive called
+2026-11-05T09:04:44.6441494Z 
+2026-11-05T09:04:44.6441504Z 
+2026-11-05T09:04:44.6441591Z Thu, 05 Nov 2026 09:03:47 GMT:updated resolved
+2026-11-05T09:04:44.6441753Z 
+2026-11-05T09:04:44.6441842Z Thu, 05 Nov 2026 09:03:48 GMT:set docker config
+2026-11-05T09:04:44.6441993Z 
+2026-11-05T09:04:44.6442088Z Thu, 05 Nov 2026 09:03:48 GMT:before audit rules
+2026-11-05T09:04:44.6442470Z Thu, 05 Nov 2026 09:03:48 GMT:added audit rules
+2026-11-05T09:04:44.6442844Z Thu, 05 Nov 2026 09:03:48 GMT:Armour is enabled
+2026-11-05T09:04:44.6443269Z Thu, 05 Nov 2026 09:03:49 GMT:[armour] Runner.Worker PID: 1971
+2026-11-05T09:04:44.6443551Z Thu, 05 Nov 2026 09:03:49 GMT:Armour attached
+2026-11-05T09:04:44.6443825Z Thu, 05 Nov 2026 09:03:49 GMT:[armour] Custom detection rules enabled
+2026-11-05T09:04:44.6444233Z Thu, 05 Nov 2026 09:03:49 GMT:done
+2026-11-05T09:04:44.6445544Z Thu, 05 Nov 2026 09:03:49 GMT:[Source code overwritten] file: /home/runner/work/demo/demo/.git/config.lock syscall: openat by exe: /usr/bin/git [824d5b2fffef332ec7ba053e579659bb12f26a0b4747da6f9c6dc0e71d36f235] Timestamp: 2026-11-05T09:03:49.724Z
+2026-11-05T09:04:44.6446871Z Thu, 05 Nov 2026 09:03:49 GMT:[Source code overwritten] file: /home/runner/work/demo/demo/.git/config syscall: rename by exe: /usr/bin/git [824d5b2fffef332ec7ba053e579659bb12f26a0b4747da6f9c6dc0e71d36f235] Timestamp: 2026-11-05T09:03:49.724Z
+2026-11-05T09:04:44.6448266Z Thu, 05 Nov 2026 09:03:49 GMT:[Source code overwritten] file: /home/runner/work/demo/demo/.git/config.lock syscall: openat by exe: /usr/bin/git [824d5b2fffef332ec7ba053e579659bb12f26a0b4747da6f9c6dc0e71d36f235] Timestamp: 2026-11-05T09:03:49.724Z
+2026-11-05T09:04:44.6449484Z Thu, 05 Nov 2026 09:03:49 GMT:domain resolved: github.com., ip address: 140.82.112.4, TTL: 57
+2026-11-05T09:04:44.6450003Z Thu, 05 Nov 2026 09:03:49 GMT:domain resolved: prod.app-api.stepsecurity.io., ip address: 54.245.175.145, TTL: 34
+2026-11-05T09:04:44.6450994Z Thu, 05 Nov 2026 09:03:50 GMT:endpoint called ip address:port 140.82.112.4:443, domain: github.com., pid: 2620, process: git-remote-http, status: 
+2026-11-05T09:04:44.6452064Z Thu, 05 Nov 2026 09:03:52 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo ln -sf /usr/bin/apt-get /usr/bin/apt-fast]
+2026-11-05T09:04:44.6453047Z Thu, 05 Nov 2026 09:03:52 GMT:sudo process started: Exe: /usr/bin/ln, Arguments: [ln -sf /usr/bin/apt-get /usr/bin/apt-fast]
+2026-11-05T09:04:44.6453890Z Thu, 05 Nov 2026 09:03:52 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo tee /tmp/sp_update]
+2026-11-05T09:04:44.6454366Z Thu, 05 Nov 2026 09:03:52 GMT:sudo process started: Exe: /usr/bin/tee, Arguments: [tee /tmp/sp_update]
+2026-11-05T09:04:44.6454866Z Thu, 05 Nov 2026 09:03:52 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo mkdir -m 777 -p /var/run /run/php]
+2026-11-05T09:04:44.6455582Z Thu, 05 Nov 2026 09:03:52 GMT:sudo process started: Exe: /usr/bin/mkdir, Arguments: [mkdir -m 777 -p /var/run /run/php]
+2026-11-05T09:04:44.6456401Z Thu, 05 Nov 2026 09:03:52 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo curl -w %{http_code} -o /tmp/install.sh -sL https://github.com/shivammathur/php-ubuntu/releases/latest/download/install.sh]
+2026-11-05T09:04:44.6457573Z Thu, 05 Nov 2026 09:03:52 GMT:sudo process started: Exe: /usr/bin/curl, Arguments: [curl -w %{http_code} -o /tmp/install.sh -sL https://github.com/shivammathur/php-ubuntu/releases/latest/download/install.sh]
+2026-11-05T09:04:44.6458388Z Thu, 05 Nov 2026 09:03:52 GMT:endpoint called ip address:port 140.82.112.4:443, domain: github.com., pid: 2781, process: curl, status: 
+2026-11-05T09:04:44.6459007Z Thu, 05 Nov 2026 09:03:52 GMT:domain resolved: release-assets.githubusercontent.com., ip address: 185.199.110.133, TTL: 62
+2026-11-05T09:04:44.6459944Z Thu, 05 Nov 2026 09:03:52 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo chmod a+x /tmp/install.sh]
+2026-11-05T09:04:44.6460734Z Thu, 05 Nov 2026 09:03:52 GMT:sudo process started: Exe: /usr/bin/chmod, Arguments: [chmod a+x /tmp/install.sh]
+2026-11-05T09:04:44.6461630Z Thu, 05 Nov 2026 09:03:52 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo curl -w %{http_code} -o /tmp/php_8.3-nts+ubuntu24.04.tar.zst -L https://github.com/shivammathur/php-ubuntu/releases/download/builds/php_8.3-nts+ubuntu24.04.tar.zst]
+2026-11-05T09:04:44.6463108Z Thu, 05 Nov 2026 09:03:52 GMT:sudo process started: Exe: /usr/bin/curl, Arguments: [curl -w %{http_code} -o /tmp/php_8.3-nts+ubuntu24.04.tar.zst -L https://github.com/shivammathur/php-ubuntu/releases/download/builds/php_8.3-nts+ubuntu24.04.tar.zst]
+2026-11-05T09:04:44.6464157Z Thu, 05 Nov 2026 09:03:52 GMT:endpoint called ip address:port 185.199.110.133:443, domain: release-assets.githubusercontent.com., pid: 2781, process: curl, status: 
+2026-11-05T09:04:44.6464836Z Thu, 05 Nov 2026 09:03:52 GMT:endpoint called ip address:port 140.82.112.4:443, domain: github.com., pid: 2789, process: curl, status: 
+2026-11-05T09:04:44.6465603Z Thu, 05 Nov 2026 09:03:52 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo cp /var/lib/dpkg/status /var/lib/dpkg/status-orig]
+2026-11-05T09:04:44.6466218Z Thu, 05 Nov 2026 09:03:52 GMT:sudo process started: Exe: /usr/bin/cp, Arguments: [cp /var/lib/dpkg/status /var/lib/dpkg/status-orig]
+2026-11-05T09:04:44.6466778Z Thu, 05 Nov 2026 09:03:52 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo rm -rf /var/lib/apt/lists/*ondrej*]
+2026-11-05T09:04:44.6467462Z Thu, 05 Nov 2026 09:03:52 GMT:sudo process started: Exe: /usr/bin/rm, Arguments: [rm -rf /var/lib/apt/lists/*ondrej*]
+2026-11-05T09:04:44.6468099Z Thu, 05 Nov 2026 09:03:52 GMT:endpoint called ip address:port 185.199.110.133:443, domain: release-assets.githubusercontent.com., pid: 2789, process: curl, status: 
+2026-11-05T09:04:44.6468809Z Thu, 05 Nov 2026 09:03:52 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo tar -I zstd -xf /tmp/php_8.3-nts+ubuntu24.04.tar.zst -C /]
+2026-11-05T09:04:44.6469433Z Thu, 05 Nov 2026 09:03:52 GMT:sudo process started: Exe: /usr/bin/tar, Arguments: [tar -I zstd -xf /tmp/php_8.3-nts+ubuntu24.04.tar.zst -C /]
+2026-11-05T09:04:44.6469967Z Thu, 05 Nov 2026 09:03:52 GMT:sudo process started: Exe: /usr/local/bin/zstd, Arguments: [zstd -d]
+2026-11-05T09:04:44.6470484Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo LC_ALL=C.UTF-8 python3 /usr/sbin/merge_status]
+2026-11-05T09:04:44.6471055Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/python3.12, Arguments: [python3 /usr/sbin/merge_status]
+2026-11-05T09:04:44.6471580Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo rm -f /usr/sbin/merge_status]
+2026-11-05T09:04:44.6472073Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/rm, Arguments: [rm -f /usr/sbin/merge_status]
+2026-11-05T09:04:44.6472624Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo mv /var/lib/dpkg/status-orig /var/lib/dpkg/status]
+2026-11-05T09:04:44.6473229Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/mv, Arguments: [mv /var/lib/dpkg/status-orig /var/lib/dpkg/status]
+2026-11-05T09:04:44.6474103Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo update-alternatives --force --install /run/php/php-fpm.sock php-fpm.sock /run/php/php8.3-fpm.sock 83]
+2026-11-05T09:04:44.6474970Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo update-alternatives --force --install /usr/lib/cgi-bin/php php-cgi-bin /usr/lib/cgi-bin/php8.3 83]
+2026-11-05T09:04:44.6476027Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo update-alternatives --force --install /usr/sbin/php-fpm php-fpm /usr/sbin/php-fpm8.3 83]
+2026-11-05T09:04:44.6477052Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo update-alternatives --force --install /usr/bin/phpize phpize /usr/bin/phpize8.3 83 --slave /usr/share/man/man1/phpize.1.gz phpize.1.gz /usr/share/man/man1/phpize8.3.1.gz]
+2026-11-05T09:04:44.6478259Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo update-alternatives --force --install /usr/bin/php-cgi php-cgi /usr/bin/php-cgi8.3 83 --slave /usr/share/man/man1/php-cgi.1.gz php-cgi.1.gz /usr/share/man/man1/php-cgi8.3.1.gz]
+2026-11-05T09:04:44.6479429Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo update-alternatives --force --install /usr/bin/phar phar /usr/bin/phar8.3 83 --slave /usr/share/man/man1/phar.1.gz phar.1.gz /usr/share/man/man1/phar8.3.1.gz]
+2026-11-05T09:04:44.6480519Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo update-alternatives --force --install /usr/bin/php php /usr/bin/php8.3 83 --slave /usr/share/man/man1/php.1.gz php.1.gz /usr/share/man/man1/php8.3.1.gz]
+2026-11-05T09:04:44.6481710Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo update-alternatives --force --install /usr/bin/php-config php-config /usr/bin/php-config8.3 83 --slave /usr/share/man/man1/php-config.1.gz php-config.1.gz /usr/share/man/man1/php-config8.3.1.gz]
+2026-11-05T09:04:44.6483112Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo update-alternatives --force --install /usr/bin/phar.phar phar.phar /usr/bin/phar.phar8.3 83 --slave /usr/share/man/man1/phar.phar.1.gz phar.phar.1.gz /usr/share/man/man1/phar.phar8.3.1.gz]
+2026-11-05T09:04:44.6484338Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo update-alternatives --force --install /usr/bin/phpdbg phpdbg /usr/bin/phpdbg8.3 83 --slave /usr/share/man/man1/phpdbg.1.gz phpdbg.1.gz /usr/share/man/man1/phpdbg8.3.1.gz]
+2026-11-05T09:04:44.6485579Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/update-alternatives, Arguments: [update-alternatives --force --install /run/php/php-fpm.sock php-fpm.sock /run/php/php8.3-fpm.sock 83]
+2026-11-05T09:04:44.6486674Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/update-alternatives, Arguments: [update-alternatives --force --install /usr/bin/phar phar /usr/bin/phar8.3 83 --slave /usr/share/man/man1/phar.1.gz phar.1.gz /usr/share/man/man1/phar8.3.1.gz]
+2026-11-05T09:04:44.6487731Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/update-alternatives, Arguments: [update-alternatives --force --install /usr/lib/cgi-bin/php php-cgi-bin /usr/lib/cgi-bin/php8.3 83]
+2026-11-05T09:04:44.6488810Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/update-alternatives, Arguments: [update-alternatives --force --install /usr/bin/phpize phpize /usr/bin/phpize8.3 83 --slave /usr/share/man/man1/phpize.1.gz phpize.1.gz /usr/share/man/man1/phpize8.3.1.gz]
+2026-11-05T09:04:44.6489864Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/update-alternatives, Arguments: [update-alternatives --force --install /usr/sbin/php-fpm php-fpm /usr/sbin/php-fpm8.3 83]
+2026-11-05T09:04:44.6491110Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/update-alternatives, Arguments: [update-alternatives --force --install /usr/bin/phar.phar phar.phar /usr/bin/phar.phar8.3 83 --slave /usr/share/man/man1/phar.phar.1.gz phar.phar.1.gz /usr/share/man/man1/phar.phar8.3.1.gz]
+2026-11-05T09:04:44.6492500Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/update-alternatives, Arguments: [update-alternatives --force --install /usr/bin/php php /usr/bin/php8.3 83 --slave /usr/share/man/man1/php.1.gz php.1.gz /usr/share/man/man1/php8.3.1.gz]
+2026-11-05T09:04:44.6493768Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/update-alternatives, Arguments: [update-alternatives --force --install /usr/bin/php-config php-config /usr/bin/php-config8.3 83 --slave /usr/share/man/man1/php-config.1.gz php-config.1.gz /usr/share/man/man1/php-config8.3.1.gz]
+2026-11-05T09:04:44.6495074Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/update-alternatives, Arguments: [update-alternatives --force --install /usr/bin/php-cgi php-cgi /usr/bin/php-cgi8.3 83 --slave /usr/share/man/man1/php-cgi.1.gz php-cgi.1.gz /usr/share/man/man1/php-cgi8.3.1.gz]
+2026-11-05T09:04:44.6496621Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/update-alternatives, Arguments: [update-alternatives --force --install /usr/bin/phpdbg phpdbg /usr/bin/phpdbg8.3 83 --slave /usr/share/man/man1/phpdbg.1.gz phpdbg.1.gz /usr/share/man/man1/phpdbg8.3.1.gz]
+2026-11-05T09:04:44.6497507Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo systemctl daemon-reload]
+2026-11-05T09:04:44.6498009Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/systemctl, Arguments: [systemctl daemon-reload]
+2026-11-05T09:04:44.6498512Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo systemctl start php8.3-fpm]
+2026-11-05T09:04:44.6499011Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/systemctl, Arguments: [systemctl start php8.3-fpm]
+2026-11-05T09:04:44.6504939Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo apt-get check -o Dir::Etc::sourcelist=/dev/null -o Dir::Etc::sourceparts=- -o Dir::Cache::pkgcache= -o Dir::Cache::srcpkgcache=]
+2026-11-05T09:04:44.6507029Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/apt-get, Arguments: [apt-get check -o Dir::Etc::sourcelist=/dev/null -o Dir::Etc::sourceparts=- -o Dir::Cache::pkgcache= -o Dir::Cache::srcpkgcache=]
+2026-11-05T09:04:44.6508084Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/dpkg, Arguments: [/usr/bin/dpkg --force-confdef --force-confold --force-unsafe-io --force-confdef --force-confold --print-foreign-architectures]
+2026-11-05T09:04:44.6509130Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/dpkg, Arguments: [/usr/bin/dpkg --force-confdef --force-confold --force-unsafe-io --force-confdef --force-confold --print-foreign-architectures]
+2026-11-05T09:04:44.6509940Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo tee /etc/php/8.3/mods-available/redis.ini]
+2026-11-05T09:04:44.6510531Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/tee, Arguments: [tee /etc/php/8.3/mods-available/redis.ini]
+2026-11-05T09:04:44.6511149Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo find /etc/php/8.3 -name 20-redis.ini -delete]
+2026-11-05T09:04:44.6511747Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/find, Arguments: [find /etc/php/8.3 -name 20-redis.ini -delete]
+2026-11-05T09:04:44.6512366Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo find /etc/php/8.3/cli/.. -name php.ini -exec readlink -m {} +]
+2026-11-05T09:04:44.6513060Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/find, Arguments: [find /etc/php/8.3/cli/.. -name php.ini -exec readlink -m {} +]
+2026-11-05T09:04:44.6514041Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/readlink, Arguments: [readlink -m /etc/php/8.3/cli/../phpdbg/php.ini /etc/php/8.3/cli/../embed/php.ini /etc/php/8.3/cli/../apache2/php.ini /etc/php/8.3/cli/../cli/php.ini /etc/php/8.3/cli/../cgi/php.ini /etc/php/8.3/cli/../fpm/php.ini]
+2026-11-05T09:04:44.6515167Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo tee /etc/php/8.3/cli/conf.d/99-pecl.ini]
+2026-11-05T09:04:44.6516015Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/tee, Arguments: [tee /etc/php/8.3/cli/conf.d/99-pecl.ini]
+2026-11-05T09:04:44.6516927Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo mkdir -p /etc/php/8.3/phpdbg/conf.d]
+2026-11-05T09:04:44.6517668Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/mkdir, Arguments: [mkdir -p /etc/php/8.3/phpdbg/conf.d]
+2026-11-05T09:04:44.6518338Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo ln -sf /etc/php/8.3/cli/conf.d/99-pecl.ini /etc/php/8.3/phpdbg/conf.d/99-pecl.ini]
+2026-11-05T09:04:44.6519066Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/ln, Arguments: [ln -sf /etc/php/8.3/cli/conf.d/99-pecl.ini /etc/php/8.3/phpdbg/conf.d/99-pecl.ini]
+2026-11-05T09:04:44.6519690Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo mkdir -p /etc/php/8.3/embed/conf.d]
+2026-11-05T09:04:44.6520221Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/mkdir, Arguments: [mkdir -p /etc/php/8.3/embed/conf.d]
+2026-11-05T09:04:44.6520850Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo ln -sf /etc/php/8.3/cli/conf.d/99-pecl.ini /etc/php/8.3/embed/conf.d/99-pecl.ini]
+2026-11-05T09:04:44.6521605Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/ln, Arguments: [ln -sf /etc/php/8.3/cli/conf.d/99-pecl.ini /etc/php/8.3/embed/conf.d/99-pecl.ini]
+2026-11-05T09:04:44.6522297Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo mkdir -p /etc/php/8.3/apache2/conf.d]
+2026-11-05T09:04:44.6522904Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/mkdir, Arguments: [mkdir -p /etc/php/8.3/apache2/conf.d]
+2026-11-05T09:04:44.6523538Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo ln -sf /etc/php/8.3/cli/conf.d/99-pecl.ini /etc/php/8.3/apache2/conf.d/99-pecl.ini]
+2026-11-05T09:04:44.6524460Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/ln, Arguments: [ln -sf /etc/php/8.3/cli/conf.d/99-pecl.ini /etc/php/8.3/apache2/conf.d/99-pecl.ini]
+2026-11-05T09:04:44.6525099Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo mkdir -p /etc/php/8.3/cgi/conf.d]
+2026-11-05T09:04:44.6525834Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/mkdir, Arguments: [mkdir -p /etc/php/8.3/cgi/conf.d]
+2026-11-05T09:04:44.6526477Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo ln -sf /etc/php/8.3/cli/conf.d/99-pecl.ini /etc/php/8.3/cgi/conf.d/99-pecl.ini]
+2026-11-05T09:04:44.6527188Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/ln, Arguments: [ln -sf /etc/php/8.3/cli/conf.d/99-pecl.ini /etc/php/8.3/cgi/conf.d/99-pecl.ini]
+2026-11-05T09:04:44.6527907Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo mkdir -p /etc/php/8.3/fpm/conf.d]
+2026-11-05T09:04:44.6528451Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/mkdir, Arguments: [mkdir -p /etc/php/8.3/fpm/conf.d]
+2026-11-05T09:04:44.6529074Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo ln -sf /etc/php/8.3/cli/conf.d/99-pecl.ini /etc/php/8.3/fpm/conf.d/99-pecl.ini]
+2026-11-05T09:04:44.6529828Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/ln, Arguments: [ln -sf /etc/php/8.3/cli/conf.d/99-pecl.ini /etc/php/8.3/fpm/conf.d/99-pecl.ini]
+2026-11-05T09:04:44.6530552Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo cp /usr/lib/php/8.3/php.ini-production /etc/php/8.3/phpdbg/php.ini]
+2026-11-05T09:04:44.6531406Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo cp /usr/lib/php/8.3/php.ini-production /etc/php/8.3/embed/php.ini]
+2026-11-05T09:04:44.6532121Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo cp /usr/lib/php/8.3/php.ini-production /etc/php/8.3/apache2/php.ini]
+2026-11-05T09:04:44.6532814Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo cp /usr/lib/php/8.3/php.ini-production /etc/php/8.3/cli/php.ini]
+2026-11-05T09:04:44.6533545Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo cp /usr/lib/php/8.3/php.ini-production /etc/php/8.3/cgi/php.ini]
+2026-11-05T09:04:44.6534212Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo cp /usr/lib/php/8.3/php.ini-production /etc/php/8.3/fpm/php.ini]
+2026-11-05T09:04:44.6534857Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/cp, Arguments: [cp /usr/lib/php/8.3/php.ini-production /etc/php/8.3/phpdbg/php.ini]
+2026-11-05T09:04:44.6535680Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/cp, Arguments: [cp /usr/lib/php/8.3/php.ini-production /etc/php/8.3/embed/php.ini]
+2026-11-05T09:04:44.6536364Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/cp, Arguments: [cp /usr/lib/php/8.3/php.ini-production /etc/php/8.3/apache2/php.ini]
+2026-11-05T09:04:44.6537017Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/cp, Arguments: [cp /usr/lib/php/8.3/php.ini-production /etc/php/8.3/cgi/php.ini]
+2026-11-05T09:04:44.6537685Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/cp, Arguments: [cp /usr/lib/php/8.3/php.ini-production /etc/php/8.3/fpm/php.ini]
+2026-11-05T09:04:44.6538325Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/cp, Arguments: [cp /usr/lib/php/8.3/php.ini-production /etc/php/8.3/cli/php.ini]
+2026-11-05T09:04:44.6539296Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo cp /usr/lib/php/8.3/php.ini-production.cli /etc/php/8.3/cli/php.ini]
+2026-11-05T09:04:44.6540441Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/cp, Arguments: [cp /usr/lib/php/8.3/php.ini-production.cli /etc/php/8.3/cli/php.ini]
+2026-11-05T09:04:44.6541079Z Thu, 05 Nov 2026 09:03:53 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo tee /usr/lib/php/8.3/php.ini-current]
+2026-11-05T09:04:44.6541615Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/tee, Arguments: [tee /usr/lib/php/8.3/php.ini-current]
+2026-11-05T09:04:44.6542878Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo tee -a /etc/php/8.3/phpdbg/php.ini /etc/php/8.3/embed/php.ini /etc/php/8.3/apache2/php.ini /etc/php/8.3/cli/php.ini /etc/php/8.3/cgi/php.ini /etc/php/8.3/fpm/php.ini]
+2026-11-05T09:04:44.6544780Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/tee, Arguments: [tee -a /etc/php/8.3/phpdbg/php.ini /etc/php/8.3/embed/php.ini /etc/php/8.3/apache2/php.ini /etc/php/8.3/cli/php.ini /etc/php/8.3/cgi/php.ini /etc/php/8.3/fpm/php.ini]
+2026-11-05T09:04:44.6546360Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo tee -a /etc/php/8.3/cli/conf.d/99-pecl.ini]
+2026-11-05T09:04:44.6547235Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/tee, Arguments: [tee -a /etc/php/8.3/cli/conf.d/99-pecl.ini]
+2026-11-05T09:04:44.6548005Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo rm -rf /usr/local/bin/phpunit]
+2026-11-05T09:04:44.6548528Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/rm, Arguments: [rm -rf /usr/local/bin/phpunit]
+2026-11-05T09:04:44.6549462Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo chmod 777 /etc/php/8.3/phpdbg/php.ini /etc/php/8.3/embed/php.ini /etc/php/8.3/apache2/php.ini /etc/php/8.3/cli/php.ini /etc/php/8.3/cgi/php.ini /etc/php/8.3/fpm/php.ini /etc/php/8.3/cli/conf.d/99-pecl.ini /usr/local/bin]
+2026-11-05T09:04:44.6551026Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/chmod, Arguments: [chmod 777 /etc/php/8.3/phpdbg/php.ini /etc/php/8.3/embed/php.ini /etc/php/8.3/apache2/php.ini /etc/php/8.3/cli/php.ini /etc/php/8.3/cgi/php.ini /etc/php/8.3/fpm/php.ini /etc/php/8.3/cli/conf.d/99-pecl.ini /usr/local/bin]
+2026-11-05T09:04:44.6552827Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo cp /home/runner/work/_actions/shivammathur/setup-php/eb7c497e18156a6bbabfef1d3a82760b9eda3962/src/scripts/../configs/pm/php.json /home/runner/work/_actions/shivammathur/setup-php/eb7c497e18156a6bbabfef1d3a82760b9eda3962/src/scripts/../configs/pm/phpunit.json /opt/hostedtoolcache/]
+2026-11-05T09:04:44.6554679Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/cp, Arguments: [cp /home/runner/work/_actions/shivammathur/setup-php/eb7c497e18156a6bbabfef1d3a82760b9eda3962/src/scripts/../configs/pm/php.json /home/runner/work/_actions/shivammathur/setup-php/eb7c497e18156a6bbabfef1d3a82760b9eda3962/src/scripts/../configs/pm/phpunit.json /opt/hostedtoolcache/]
+2026-11-05T09:04:44.6556134Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo mkdir -p /opt/hostedtoolcache/setup-php/tools]
+2026-11-05T09:04:44.6556732Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/mkdir, Arguments: [mkdir -p /opt/hostedtoolcache/setup-php/tools]
+2026-11-05T09:04:44.6557603Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo curl -w %{http_code} -o /usr/local/bin/composer -sL https://github.com/shivammathur/composer-cache/releases/latest/download/composer-8.3-2.phar]
+2026-11-05T09:04:44.6558680Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/curl, Arguments: [curl -w %{http_code} -o /usr/local/bin/composer -sL https://github.com/shivammathur/composer-cache/releases/latest/download/composer-8.3-2.phar]
+2026-11-05T09:04:44.6559550Z Thu, 05 Nov 2026 09:03:54 GMT:endpoint called ip address:port 140.82.112.4:443, domain: github.com., pid: 3010, process: curl, status: 
+2026-11-05T09:04:44.6560270Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo chmod a+x /usr/local/bin/composer]
+2026-11-05T09:04:44.6560843Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/chmod, Arguments: [chmod a+x /usr/local/bin/composer]
+2026-11-05T09:04:44.6561374Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo rm -f /usr/local/bin/composer.bak]
+2026-11-05T09:04:44.6561892Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/rm, Arguments: [rm -f /usr/local/bin/composer.bak]
+2026-11-05T09:04:44.6562474Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo ln -sf /usr/local/bin/composer /usr/local/bin/composer.phar]
+2026-11-05T09:04:44.6563473Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/ln, Arguments: [ln -sf /usr/local/bin/composer /usr/local/bin/composer.phar]
+2026-11-05T09:04:44.6564622Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo chown -R runner:runner /home/runner/.composer]
+2026-11-05T09:04:44.6565830Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/chown, Arguments: [chown -R runner:runner /home/runner/.composer]
+2026-11-05T09:04:44.6566397Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo tee /tmp/composer_version]
+2026-11-05T09:04:44.6566898Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/tee, Arguments: [tee /tmp/composer_version]
+2026-11-05T09:04:44.6567405Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo tee /tmp/composer_version]
+2026-11-05T09:04:44.6567894Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/tee, Arguments: [tee /tmp/composer_version]
+2026-11-05T09:04:44.6568711Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo ln -sfn /usr/local/bin/composer /opt/hostedtoolcache/setup-php/tools/composer]
+2026-11-05T09:04:44.6569439Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/ln, Arguments: [ln -sfn /usr/local/bin/composer /opt/hostedtoolcache/setup-php/tools/composer]
+2026-11-05T09:04:44.6570219Z Thu, 05 Nov 2026 09:03:54 GMT:endpoint called ip address:port 185.199.110.133:443, domain: release-assets.githubusercontent.com., pid: 3010, process: curl, status: 
+2026-11-05T09:04:44.6571323Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo sed -Ei /=(.*\/)?"?xdebug(.so)?"?$/d /etc/php/8.3/phpdbg/php.ini /etc/php/8.3/embed/php.ini /etc/php/8.3/apache2/php.ini /etc/php/8.3/cli/php.ini /etc/php/8.3/cgi/php.ini /etc/php/8.3/fpm/php.ini /etc/php/8.3/cli/conf.d/99-pecl.ini]
+2026-11-05T09:04:44.6572703Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/sed, Arguments: [sed -Ei /=(.*\/)?"?xdebug(.so)?"?$/d /etc/php/8.3/phpdbg/php.ini /etc/php/8.3/embed/php.ini /etc/php/8.3/apache2/php.ini /etc/php/8.3/cli/php.ini /etc/php/8.3/cgi/php.ini /etc/php/8.3/fpm/php.ini /etc/php/8.3/cli/conf.d/99-pecl.ini]
+2026-11-05T09:04:44.6573914Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo find /etc/php/8.3/cli/.. -name *-xdebug.ini -not -path *phar.ini -not -path *pecl.ini -not -path *mods-available* -delete]
+2026-11-05T09:04:44.6574915Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/find, Arguments: [find /etc/php/8.3/cli/.. -name *-xdebug.ini -not -path *phar.ini -not -path *pecl.ini -not -path *mods-available* -delete]
+2026-11-05T09:04:44.6575870Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo rm -f /tmp/php8.3_extensions]
+2026-11-05T09:04:44.6576385Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/rm, Arguments: [rm -f /tmp/php8.3_extensions]
+2026-11-05T09:04:44.6576921Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo tee /tmp/extdisabled/8.3/xdebug]
+2026-11-05T09:04:44.6577430Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/tee, Arguments: [tee /tmp/extdisabled/8.3/xdebug]
+2026-11-05T09:04:44.6578131Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo find /var/lib/php/modules/8.3 -path *disabled*pcov -delete]
+2026-11-05T09:04:44.6578819Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/find, Arguments: [find /var/lib/php/modules/8.3 -path *disabled*pcov -delete]
+2026-11-05T09:04:44.6579498Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo sed -Ei /=(.*\/)?"?pcov(.so)?"?$/d /etc/php/8.3/cli/conf.d/99-pecl.ini]
+2026-11-05T09:04:44.6580157Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/sed, Arguments: [sed -Ei /=(.*\/)?"?pcov(.so)?"?$/d /etc/php/8.3/cli/conf.d/99-pecl.ini]
+2026-11-05T09:04:44.6580732Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo phpenmod -v 8.3 pcov]
+2026-11-05T09:04:44.6581256Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/dash, Arguments: [/bin/sh /usr/sbin/phpenmod -v 8.3 pcov]
+2026-11-05T09:04:44.6581740Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/expr, Arguments: [expr 3 - 1]
+2026-11-05T09:04:44.6582240Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/dash, Arguments: [/bin/sh /usr/sbin/phpquery -S -v 8.3]
+2026-11-05T09:04:44.6582701Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/expr, Arguments: [expr 4 - 1]
+2026-11-05T09:04:44.6583560Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/find, Arguments: [find /usr/lib/php/8.3/sapi -mindepth 1 -maxdepth 1 ! ( -name *.dpkg-old -name *.dpkg-new -name *.dpkg-dist -name *~ -name *.bak -name *.ucf-old -name *.ucf-new -name *.ucf-dist -name *% ) -printf %f\n]
+2026-11-05T09:04:44.6584778Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/sed, Arguments: [sed -ne s/^;[[:space:]]*priority[[:space:]]*=[[:space:]]*\([0-9]\+\)[[:space:]]*$/\1/p; /^[0-9]\+$/q /etc/php/8.3/mods-available/pcov.ini]
+2026-11-05T09:04:44.6585723Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/dash, Arguments: [/bin/sh /usr/sbin/phpquery -q -v 8.3 -s phpdbg -m pcov]
+2026-11-05T09:04:44.6586250Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/expr, Arguments: [expr 8 - 1]
+2026-11-05T09:04:44.6586892Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/sed, Arguments: [sed -ne s/^;[[:space:]]*priority[[:space:]]*=[[:space:]]*\([0-9]\+\)[[:space:]]*$/\1/p; /^[0-9]\+$/q /etc/php/8.3/mods-available/pcov.ini]
+2026-11-05T09:04:44.6587695Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/ln, Arguments: [ln -s /etc/php/8.3/mods-available/pcov.ini /etc/php/8.3/phpdbg/conf.d/20-pcov.ini]
+2026-11-05T09:04:44.6588367Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/rm, Arguments: [rm -f /var/lib/php/modules/8.3/phpdbg/disabled_by_admin/pcov]
+2026-11-05T09:04:44.6588989Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/rm, Arguments: [rm -f /var/lib/php/modules/8.3/phpdbg/disabled_by_maint/pcov]
+2026-11-05T09:04:44.6589589Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/rm, Arguments: [rm -f /var/lib/php/modules/8.3/phpdbg/enabled_by_admin/pcov]
+2026-11-05T09:04:44.6590183Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/rm, Arguments: [rm -f /var/lib/php/modules/8.3/phpdbg/enabled_by_maint/pcov]
+2026-11-05T09:04:44.6590861Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/dirname, Arguments: [dirname /var/lib/php/modules/8.3/phpdbg/enabled_by_admin/pcov]
+2026-11-05T09:04:44.6591520Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/mkdir, Arguments: [mkdir -p /var/lib/php/modules/8.3/phpdbg/enabled_by_admin]
+2026-11-05T09:04:44.6592153Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/touch, Arguments: [touch /var/lib/php/modules/8.3/phpdbg/enabled_by_admin/pcov]
+2026-11-05T09:04:44.6593033Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/sed, Arguments: [sed -ne s/^;[[:space:]]*priority[[:space:]]*=[[:space:]]*\([0-9]\+\)[[:space:]]*$/\1/p; /^[0-9]\+$/q /etc/php/8.3/mods-available/pcov.ini]
+2026-11-05T09:04:44.6593791Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/dash, Arguments: [/bin/sh /usr/sbin/phpquery -q -v 8.3 -s embed -m pcov]
+2026-11-05T09:04:44.6594305Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/expr, Arguments: [expr 8 - 1]
+2026-11-05T09:04:44.6594984Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/sed, Arguments: [sed -ne s/^;[[:space:]]*priority[[:space:]]*=[[:space:]]*\([0-9]\+\)[[:space:]]*$/\1/p; /^[0-9]\+$/q /etc/php/8.3/mods-available/pcov.ini]
+2026-11-05T09:04:44.6595931Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/ln, Arguments: [ln -s /etc/php/8.3/mods-available/pcov.ini /etc/php/8.3/embed/conf.d/20-pcov.ini]
+2026-11-05T09:04:44.6596605Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/rm, Arguments: [rm -f /var/lib/php/modules/8.3/embed/disabled_by_admin/pcov]
+2026-11-05T09:04:44.6597202Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/rm, Arguments: [rm -f /var/lib/php/modules/8.3/embed/disabled_by_maint/pcov]
+2026-11-05T09:04:44.6597802Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/rm, Arguments: [rm -f /var/lib/php/modules/8.3/embed/enabled_by_admin/pcov]
+2026-11-05T09:04:44.6598387Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/rm, Arguments: [rm -f /var/lib/php/modules/8.3/embed/enabled_by_maint/pcov]
+2026-11-05T09:04:44.6599023Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/dirname, Arguments: [dirname /var/lib/php/modules/8.3/embed/enabled_by_admin/pcov]
+2026-11-05T09:04:44.6599676Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/mkdir, Arguments: [mkdir -p /var/lib/php/modules/8.3/embed/enabled_by_admin]
+2026-11-05T09:04:44.6600422Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/touch, Arguments: [touch /var/lib/php/modules/8.3/embed/enabled_by_admin/pcov]
+2026-11-05T09:04:44.6601181Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/sed, Arguments: [sed -ne s/^;[[:space:]]*priority[[:space:]]*=[[:space:]]*\([0-9]\+\)[[:space:]]*$/\1/p; /^[0-9]\+$/q /etc/php/8.3/mods-available/pcov.ini]
+2026-11-05T09:04:44.6601908Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/dash, Arguments: [/bin/sh /usr/sbin/phpquery -q -v 8.3 -s apache2 -m pcov]
+2026-11-05T09:04:44.6602415Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/expr, Arguments: [expr 8 - 1]
+2026-11-05T09:04:44.6603049Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/sed, Arguments: [sed -ne s/^;[[:space:]]*priority[[:space:]]*=[[:space:]]*\([0-9]\+\)[[:space:]]*$/\1/p; /^[0-9]\+$/q /etc/php/8.3/mods-available/pcov.ini]
+2026-11-05T09:04:44.6603850Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/ln, Arguments: [ln -s /etc/php/8.3/mods-available/pcov.ini /etc/php/8.3/apache2/conf.d/20-pcov.ini]
+2026-11-05T09:04:44.6604525Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/rm, Arguments: [rm -f /var/lib/php/modules/8.3/apache2/disabled_by_admin/pcov]
+2026-11-05T09:04:44.6605128Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/rm, Arguments: [rm -f /var/lib/php/modules/8.3/apache2/disabled_by_maint/pcov]
+2026-11-05T09:04:44.6605825Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/rm, Arguments: [rm -f /var/lib/php/modules/8.3/apache2/enabled_by_admin/pcov]
+2026-11-05T09:04:44.6606444Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/rm, Arguments: [rm -f /var/lib/php/modules/8.3/apache2/enabled_by_maint/pcov]
+2026-11-05T09:04:44.6607082Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/dirname, Arguments: [dirname /var/lib/php/modules/8.3/apache2/enabled_by_admin/pcov]
+2026-11-05T09:04:44.6607725Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/mkdir, Arguments: [mkdir -p /var/lib/php/modules/8.3/apache2/enabled_by_admin]
+2026-11-05T09:04:44.6608475Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/touch, Arguments: [touch /var/lib/php/modules/8.3/apache2/enabled_by_admin/pcov]
+2026-11-05T09:04:44.6609231Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/sed, Arguments: [sed -ne s/^;[[:space:]]*priority[[:space:]]*=[[:space:]]*\([0-9]\+\)[[:space:]]*$/\1/p; /^[0-9]\+$/q /etc/php/8.3/mods-available/pcov.ini]
+2026-11-05T09:04:44.6609998Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/dash, Arguments: [/bin/sh /usr/sbin/phpquery -q -v 8.3 -s cli -m pcov]
+2026-11-05T09:04:44.6610509Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/expr, Arguments: [expr 8 - 1]
+2026-11-05T09:04:44.6611146Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/sed, Arguments: [sed -ne s/^;[[:space:]]*priority[[:space:]]*=[[:space:]]*\([0-9]\+\)[[:space:]]*$/\1/p; /^[0-9]\+$/q /etc/php/8.3/mods-available/pcov.ini]
+2026-11-05T09:04:44.6611924Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/ln, Arguments: [ln -s /etc/php/8.3/mods-available/pcov.ini /etc/php/8.3/cli/conf.d/20-pcov.ini]
+2026-11-05T09:04:44.6612581Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/rm, Arguments: [rm -f /var/lib/php/modules/8.3/cli/disabled_by_admin/pcov]
+2026-11-05T09:04:44.6613171Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/rm, Arguments: [rm -f /var/lib/php/modules/8.3/cli/disabled_by_maint/pcov]
+2026-11-05T09:04:44.6613764Z Thu, 05 Nov 2026 09:03:54 GMT:sudo process started: Exe: /usr/bin/rm, Arguments: [rm -f /var/lib/php/modules/8.3/cli/enabled_by_admin/pcov]
+2026-11-05T09:04:44.6614721Z Thu, 05 Nov 2026 09:03:55 GMT:sudo process started: Exe: /usr/bin/rm, Arguments: [rm -f /var/lib/php/modules/8.3/cli/enabled_by_maint/pcov]
+2026-11-05T09:04:44.6615814Z Thu, 05 Nov 2026 09:03:55 GMT:sudo process started: Exe: /usr/bin/dirname, Arguments: [dirname /var/lib/php/modules/8.3/cli/enabled_by_admin/pcov]
+2026-11-05T09:04:44.6616458Z Thu, 05 Nov 2026 09:03:55 GMT:sudo process started: Exe: /usr/bin/mkdir, Arguments: [mkdir -p /var/lib/php/modules/8.3/cli/enabled_by_admin]
+2026-11-05T09:04:44.6617067Z Thu, 05 Nov 2026 09:03:55 GMT:sudo process started: Exe: /usr/bin/touch, Arguments: [touch /var/lib/php/modules/8.3/cli/enabled_by_admin/pcov]
+2026-11-05T09:04:44.6617804Z Thu, 05 Nov 2026 09:03:55 GMT:sudo process started: Exe: /usr/bin/sed, Arguments: [sed -ne s/^;[[:space:]]*priority[[:space:]]*=[[:space:]]*\([0-9]\+\)[[:space:]]*$/\1/p; /^[0-9]\+$/q /etc/php/8.3/mods-available/pcov.ini]
+2026-11-05T09:04:44.6618541Z Thu, 05 Nov 2026 09:03:55 GMT:sudo process started: Exe: /usr/bin/dash, Arguments: [/bin/sh /usr/sbin/phpquery -q -v 8.3 -s cgi -m pcov]
+2026-11-05T09:04:44.6619056Z Thu, 05 Nov 2026 09:03:55 GMT:sudo process started: Exe: /usr/bin/expr, Arguments: [expr 8 - 1]
+2026-11-05T09:04:44.6619693Z Thu, 05 Nov 2026 09:03:55 GMT:sudo process started: Exe: /usr/bin/sed, Arguments: [sed -ne s/^;[[:space:]]*priority[[:space:]]*=[[:space:]]*\([0-9]\+\)[[:space:]]*$/\1/p; /^[0-9]\+$/q /etc/php/8.3/mods-available/pcov.ini]
+2026-11-05T09:04:44.6620476Z Thu, 05 Nov 2026 09:03:55 GMT:sudo process started: Exe: /usr/bin/ln, Arguments: [ln -s /etc/php/8.3/mods-available/pcov.ini /etc/php/8.3/cgi/conf.d/20-pcov.ini]
+2026-11-05T09:04:44.6621114Z Thu, 05 Nov 2026 09:03:55 GMT:sudo process started: Exe: /usr/bin/rm, Arguments: [rm -f /var/lib/php/modules/8.3/cgi/disabled_by_admin/pcov]
+2026-11-05T09:04:44.6621710Z Thu, 05 Nov 2026 09:03:55 GMT:sudo process started: Exe: /usr/bin/rm, Arguments: [rm -f /var/lib/php/modules/8.3/cgi/disabled_by_maint/pcov]
+2026-11-05T09:04:44.6622294Z Thu, 05 Nov 2026 09:03:55 GMT:sudo process started: Exe: /usr/bin/rm, Arguments: [rm -f /var/lib/php/modules/8.3/cgi/enabled_by_admin/pcov]
+2026-11-05T09:04:44.6622907Z Thu, 05 Nov 2026 09:03:55 GMT:sudo process started: Exe: /usr/bin/rm, Arguments: [rm -f /var/lib/php/modules/8.3/cgi/enabled_by_maint/pcov]
+2026-11-05T09:04:44.6623657Z Thu, 05 Nov 2026 09:03:55 GMT:sudo process started: Exe: /usr/bin/dirname, Arguments: [dirname /var/lib/php/modules/8.3/cgi/enabled_by_admin/pcov]
+2026-11-05T09:04:44.6624314Z Thu, 05 Nov 2026 09:03:55 GMT:sudo process started: Exe: /usr/bin/mkdir, Arguments: [mkdir -p /var/lib/php/modules/8.3/cgi/enabled_by_admin]
+2026-11-05T09:04:44.6624948Z Thu, 05 Nov 2026 09:03:55 GMT:sudo process started: Exe: /usr/bin/touch, Arguments: [touch /var/lib/php/modules/8.3/cgi/enabled_by_admin/pcov]
+2026-11-05T09:04:44.6625814Z Thu, 05 Nov 2026 09:03:55 GMT:sudo process started: Exe: /usr/bin/sed, Arguments: [sed -ne s/^;[[:space:]]*priority[[:space:]]*=[[:space:]]*\([0-9]\+\)[[:space:]]*$/\1/p; /^[0-9]\+$/q /etc/php/8.3/mods-available/pcov.ini]
+2026-11-05T09:04:44.6626539Z Thu, 05 Nov 2026 09:03:55 GMT:sudo process started: Exe: /usr/bin/dash, Arguments: [/bin/sh /usr/sbin/phpquery -q -v 8.3 -s fpm -m pcov]
+2026-11-05T09:04:44.6627058Z Thu, 05 Nov 2026 09:03:55 GMT:sudo process started: Exe: /usr/bin/expr, Arguments: [expr 8 - 1]
+2026-11-05T09:04:44.6627715Z Thu, 05 Nov 2026 09:03:55 GMT:sudo process started: Exe: /usr/bin/sed, Arguments: [sed -ne s/^;[[:space:]]*priority[[:space:]]*=[[:space:]]*\([0-9]\+\)[[:space:]]*$/\1/p; /^[0-9]\+$/q /etc/php/8.3/mods-available/pcov.ini]
+2026-11-05T09:04:44.6628492Z Thu, 05 Nov 2026 09:03:55 GMT:sudo process started: Exe: /usr/bin/ln, Arguments: [ln -s /etc/php/8.3/mods-available/pcov.ini /etc/php/8.3/fpm/conf.d/20-pcov.ini]
+2026-11-05T09:04:44.6629132Z Thu, 05 Nov 2026 09:03:55 GMT:sudo process started: Exe: /usr/bin/rm, Arguments: [rm -f /var/lib/php/modules/8.3/fpm/disabled_by_admin/pcov]
+2026-11-05T09:04:44.6629745Z Thu, 05 Nov 2026 09:03:55 GMT:sudo process started: Exe: /usr/bin/rm, Arguments: [rm -f /var/lib/php/modules/8.3/fpm/disabled_by_maint/pcov]
+2026-11-05T09:04:44.6630458Z Thu, 05 Nov 2026 09:03:55 GMT:sudo process started: Exe: /usr/bin/rm, Arguments: [rm -f /var/lib/php/modules/8.3/fpm/enabled_by_admin/pcov]
+2026-11-05T09:04:44.6631040Z Thu, 05 Nov 2026 09:03:55 GMT:sudo process started: Exe: /usr/bin/rm, Arguments: [rm -f /var/lib/php/modules/8.3/fpm/enabled_by_maint/pcov]
+2026-11-05T09:04:44.6631676Z Thu, 05 Nov 2026 09:03:55 GMT:sudo process started: Exe: /usr/bin/dirname, Arguments: [dirname /var/lib/php/modules/8.3/fpm/enabled_by_admin/pcov]
+2026-11-05T09:04:44.6632301Z Thu, 05 Nov 2026 09:03:55 GMT:sudo process started: Exe: /usr/bin/mkdir, Arguments: [mkdir -p /var/lib/php/modules/8.3/fpm/enabled_by_admin]
+2026-11-05T09:04:44.6632931Z Thu, 05 Nov 2026 09:03:55 GMT:sudo process started: Exe: /usr/bin/touch, Arguments: [touch /var/lib/php/modules/8.3/fpm/enabled_by_admin/pcov]
+2026-11-05T09:04:44.6633523Z Thu, 05 Nov 2026 09:03:55 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo tee -a /etc/php/8.3/cli/conf.d/99-pecl.ini]
+2026-11-05T09:04:44.6634086Z Thu, 05 Nov 2026 09:03:55 GMT:sudo process started: Exe: /usr/bin/tee, Arguments: [tee -a /etc/php/8.3/cli/conf.d/99-pecl.ini]
+2026-11-05T09:04:44.6634603Z Thu, 05 Nov 2026 09:03:55 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo rm -f /usr/bin/apt-fast]
+2026-11-05T09:04:44.6635108Z Thu, 05 Nov 2026 09:03:55 GMT:sudo process started: Exe: /usr/bin/rm, Arguments: [rm -f /usr/bin/apt-fast]
+2026-11-05T09:04:44.6635713Z Thu, 05 Nov 2026 09:03:55 GMT:sudo process started: Exe: /usr/bin/sudo, Arguments: [sudo -K]
+2026-11-05T09:04:44.6636158Z Thu, 05 Nov 2026 09:03:55 GMT:domain resolved: repo.packagist.org., ip address: 143.244.49.180, TTL: 35
+2026-11-05T09:04:44.6636600Z Thu, 05 Nov 2026 09:03:55 GMT:domain resolved: api.github.com., ip address: 140.82.113.5, TTL: 52
+2026-11-05T09:04:44.6637148Z Thu, 05 Nov 2026 09:03:55 GMT:endpoint called ip address:port 143.244.49.180:443, domain: repo.packagist.org., pid: 3247, process: php8.3, status: 
+2026-11-05T09:04:44.6637777Z Thu, 05 Nov 2026 09:03:55 GMT:endpoint called ip address:port 140.82.113.5:443, domain: api.github.com., pid: 3247, process: php8.3, status: 
+2026-11-05T09:04:44.6638315Z Thu, 05 Nov 2026 09:03:55 GMT:domain resolved: codeload.github.com., ip address: 140.82.112.10, TTL: 30
+2026-11-05T09:04:44.6639027Z Thu, 05 Nov 2026 09:03:55 GMT:endpoint called ip address:port 140.82.112.10:443, domain: codeload.github.com., pid: 3247, process: php8.3, status: 
+2026-11-05T09:04:44.6639561Z Thu, 05 Nov 2026 09:04:00 GMT:domain resolved: packagist.org., ip address: 143.244.49.183, TTL: 35
+2026-11-05T09:04:44.6640084Z Thu, 05 Nov 2026 09:04:00 GMT:endpoint called ip address:port 143.244.49.183:443, domain: packagist.org., pid: 3247, process: php8.3, status: 
+2026-11-05T09:04:44.6640672Z Thu, 05 Nov 2026 09:04:00 GMT:endpoint called ip address:port 140.82.112.4:443, domain: github.com., pid: 3430, process: curl, status: 
+2026-11-05T09:04:44.6640991Z 
+2026-11-05T09:04:44.6641093Z Thu, 05 Nov 2026 09:04:43 GMT:post_event called
+2026-11-05T09:04:44.6641538Z Thu, 05 Nov 2026 09:04:43 GMT:domain resolved: results-receiver.actions.githubusercontent.com., ip address: 140.82.113.22, TTL: 30
+2026-11-05T09:04:44.6642304Z Thu, 05 Nov 2026 09:04:44 GMT:endpoint called ip address:port 140.82.113.22:443, domain: results-receiver.actions.githubusercontent.com., pid: 1971, process: Runner.Worker, status: 
+2026-11-05T09:04:44.6642891Z 
+2026-11-05T09:04:44.6642968Z status:
+2026-11-05T09:04:44.6643133Z Initialized
+2026-11-05T09:04:44.6643351Z agent.service log:
+2026-11-05T09:04:44.6644096Z Nov 05 09:03:47 runnervm48cm3 systemd[1]: /etc/systemd/system/agent.service:9: Standard output type syslog is obsolete, automatically updating to journal. Please update your unit file, and consider removing the setting altogether.
+2026-11-05T09:04:44.6645203Z Nov 05 09:03:47 runnervm48cm3 systemd[1]: /etc/systemd/system/agent.service:10: Standard output type syslog is obsolete, automatically updating to journal. Please update your unit file, and consider removing the setting altogether.
+2026-11-05T09:04:44.6646246Z Nov 05 09:03:47 runnervm48cm3 systemd[1]: Started agent.service - Agent.
+2026-11-05T09:04:44.6647069Z Nov 05 09:03:47 runnervm48cm3 sudo[2116]:     root : *** ; USER=root ; COMMAND=/usr/bin/systemctl stop systemd-resolved
+2026-11-05T09:04:44.6647646Z Nov 05 09:03:47 runnervm48cm3 sudo[2116]: pam_unix(sudo:session): session opened for user root(uid=0) by (uid=0)
+2026-11-05T09:04:44.6648133Z Nov 05 09:03:47 runnervm48cm3 sudo[2116]: pam_unix(sudo:session): session closed for user root
+2026-11-05T09:04:44.6648675Z Nov 05 09:03:47 runnervm48cm3 sudo[2122]:     root : *** ; USER=root ; COMMAND=/usr/bin/systemctl restart systemd-resolved
+2026-11-05T09:04:44.6649216Z Nov 05 09:03:47 runnervm48cm3 sudo[2122]: pam_unix(sudo:session): session opened for user root(uid=0) by (uid=0)
+2026-11-05T09:04:44.6649694Z Nov 05 09:03:47 runnervm48cm3 sudo[2122]: pam_unix(sudo:session): session closed for user root
+2026-11-05T09:04:44.6650195Z Nov 05 09:03:47 runnervm48cm3 sudo[2128]:     root : *** ; USER=root ; COMMAND=/usr/bin/resolvectl flush-caches
+2026-11-05T09:04:44.6650718Z Nov 05 09:03:47 runnervm48cm3 sudo[2128]: pam_unix(sudo:session): session opened for user root(uid=0) by (uid=0)
+2026-11-05T09:04:44.6651177Z Nov 05 09:03:47 runnervm48cm3 sudo[2128]: pam_unix(sudo:session): session closed for user root
+2026-11-05T09:04:44.6651654Z Nov 05 09:03:47 runnervm48cm3 sudo[2131]:     root : *** ; USER=root ; COMMAND=/usr/bin/systemctl reload docker
+2026-11-05T09:04:44.6652127Z Nov 05 09:03:47 runnervm48cm3 sudo[2131]: pam_unix(sudo:session): session opened for user root(uid=0) by (uid=0)
+2026-11-05T09:04:44.6652574Z Nov 05 09:03:47 runnervm48cm3 sudo[2131]: pam_unix(sudo:session): session closed for user root
+2026-11-05T09:04:44.6653050Z Nov 05 09:03:47 runnervm48cm3 sudo[2137]:     root : *** ; USER=root ; COMMAND=/usr/bin/systemctl daemon-reload
+2026-11-05T09:04:44.6653531Z Nov 05 09:03:47 runnervm48cm3 sudo[2137]: pam_unix(sudo:session): session opened for user root(uid=0) by (uid=0)
+2026-11-05T09:04:44.6654343Z Nov 05 09:03:47 runnervm48cm3 systemd[1]: /etc/systemd/system/agent.service:9: Standard output type syslog is obsolete, automatically updating to journal. Please update your unit file, and consider removing the setting altogether.
+2026-11-05T09:04:44.6655654Z Nov 05 09:03:47 runnervm48cm3 systemd[1]: /etc/systemd/system/agent.service:10: Standard output type syslog is obsolete, automatically updating to journal. Please update your unit file, and consider removing the setting altogether.
+2026-11-05T09:04:44.6656421Z Nov 05 09:03:47 runnervm48cm3 sudo[2137]: pam_unix(sudo:session): session closed for user root
+2026-11-05T09:04:44.6656923Z Nov 05 09:03:47 runnervm48cm3 sudo[2210]:     root : *** ; USER=root ; COMMAND=/usr/bin/systemctl restart docker
+2026-11-05T09:04:44.6657422Z Nov 05 09:03:47 runnervm48cm3 sudo[2210]: pam_unix(sudo:session): session opened for user root(uid=0) by (uid=0)
+2026-11-05T09:04:44.6657878Z Nov 05 09:03:48 runnervm48cm3 sudo[2210]: pam_unix(sudo:session): session closed for user root
+2026-11-05T09:04:44.6658574Z Nov 05 09:03:48 runnervm48cm3 agentservice[2101]: 2026/11/05 09:03:48 INFO Fetching custom detection rules module=armour api_url=https://agent.api.stepsecurity.io/v1 repo=octocat/demo
+2026-11-05T09:04:44.6659334Z Nov 05 09:03:49 runnervm48cm3 agentservice[2101]: 2026/11/05 09:03:49 INFO Custom detection rules evaluator initialized module=armour
+2026-11-05T09:04:44.6659982Z Nov 05 09:03:49 runnervm48cm3 agentservice[2101]: 2026/11/05 09:03:49 INFO Detection manager started module=detection-manager workers=4 buffer_size=1000
+2026-11-05T09:04:44.6660626Z Nov 05 09:03:49 runnervm48cm3 agentservice[2101]: 2026/11/05 09:03:49 INFO Selected Armour variant module=armour variant=fmod_ret
+2026-11-05T09:04:44.6661167Z Nov 05 09:03:49 runnervm48cm3 agentservice[2101]: 2026/11/05 09:03:49 INFO Config module=armour AGENT_PID=2101
+2026-11-05T09:04:44.6661683Z Nov 05 09:03:49 runnervm48cm3 agentservice[2101]: 2026/11/05 09:03:49 INFO Config module=armour ENFORCE_READ_BLOCK=false
+2026-11-05T09:04:44.6662351Z Nov 05 09:03:49 runnervm48cm3 agentservice[2101]: 2026/11/05 09:03:49 INFO Config module=armour ENFORCE_WRITE_BLOCK=false
+2026-11-05T09:04:44.6662884Z Nov 05 09:03:49 runnervm48cm3 agentservice[2101]: 2026/11/05 09:03:49 INFO Config module=armour ENFORCE_KILL_BLOCK=true
+2026-11-05T09:04:44.6663392Z Nov 05 09:03:49 runnervm48cm3 agentservice[2101]: 2026/11/05 09:03:49 INFO Map size module=armour events=16384
+2026-11-05T09:04:44.6663886Z Nov 05 09:03:49 runnervm48cm3 agentservice[2101]: 2026/11/05 09:03:49 INFO Map size module=armour protected_pids=1
+2026-11-05T09:04:44.6664398Z Nov 05 09:03:49 runnervm48cm3 agentservice[2101]: 2026/11/05 09:03:49 INFO Map size module=armour protected_pid_inodes=1
+2026-11-05T09:04:44.6664917Z Nov 05 09:03:49 runnervm48cm3 agentservice[2101]: 2026/11/05 09:03:49 INFO Map size module=armour protected_bpf_ids=9
+2026-11-05T09:04:44.6665526Z Nov 05 09:03:49 runnervm48cm3 agentservice[2101]: 2026/11/05 09:03:49 INFO Map size module=armour protected_fs_inodes=6
+2026-11-05T09:04:44.6666065Z Nov 05 09:03:49 runnervm48cm3 agentservice[2101]: 2026/11/05 09:03:49 INFO Map size module=armour protected_proc_fs_inodes=2
+2026-11-05T09:04:44.6666603Z Nov 05 09:03:49 runnervm48cm3 agentservice[2101]: 2026/11/05 09:03:49 INFO ProtectedPids module=armour pids=map[4626:2101]
+2026-11-05T09:04:44.6667150Z Nov 05 09:03:49 runnervm48cm3 agentservice[2101]: 2026/11/05 09:03:49 INFO ProtectedBPFIDs module=armour ids="[20 18 14 21 19]"
+2026-11-05T09:04:44.6667757Z Nov 05 09:03:49 runnervm48cm3 agentservice[2101]: 2026/11/05 09:03:49 INFO File Info module=armour inoKey="{Device:25 Inode:13125}" path=/proc/1971/mem
+2026-11-05T09:04:44.6668410Z Nov 05 09:03:49 runnervm48cm3 agentservice[2101]: 2026/11/05 09:03:49 INFO File Info module=armour inoKey="{Device:25 Inode:16843}" path=/proc/1951/mem
+2026-11-05T09:04:44.6669072Z Nov 05 09:03:49 runnervm48cm3 agentservice[2101]: 2026/11/05 09:03:49 INFO File Info module=armour inoKey="{Device:769 Inode:101}" path=/etc/sudoers.d/runner
+2026-11-05T09:04:44.6669737Z Nov 05 09:03:49 runnervm48cm3 agentservice[2101]: 2026/11/05 09:03:49 INFO File Info module=armour inoKey="{Device:29 Inode:926}" path=/etc/resolv.conf
+2026-11-05T09:04:44.6670525Z Nov 05 09:03:49 runnervm48cm3 agentservice[2101]: 2026/11/05 09:03:49 INFO File Info module=armour inoKey="{Device:769 Inode:508}" path=/etc/systemd/resolved.conf
+2026-11-05T09:04:44.6671236Z Nov 05 09:03:49 runnervm48cm3 agentservice[2101]: 2026/11/05 09:03:49 INFO File Info module=armour inoKey="{Device:769 Inode:262150}" path=/etc/docker/daemon.json
+2026-11-05T09:04:44.6671836Z Nov 05 09:03:49 runnervm48cm3 agentservice[2101]: 2026/11/05 09:03:49 INFO Protection maps populated module=armour
+2026-11-05T09:04:44.6672337Z Nov 05 09:03:49 runnervm48cm3 agentservice[2101]: 2026/11/05 09:03:49 INFO Protection maps are freezed module=armour
+2026-11-05T09:04:44.6672895Z Nov 05 09:03:49 runnervm48cm3 agentservice[2101]: 2026/11/05 09:03:49 INFO Linking completed module=armour
+2026-11-05T09:04:44.6673563Z Nov 05 09:03:49 runnervm48cm3 agentservice[2101]: 2026/11/05 09:03:49 INFO Armour engaged module=armour
+2026-11-05T09:04:44.6674093Z Nov 05 09:03:49 runnervm48cm3 agentservice[2101]: 2026/11/05 09:03:49 INFO RingBuffer created module=armour size=16384
+2026-11-05T09:04:44.6674594Z Nov 05 09:03:49 runnervm48cm3 agentservice[2101]: 2026/11/05 09:03:49 INFO Listening for events module=armour
+2026-11-05T09:04:44.6675126Z Nov 05 09:03:49 runnervm48cm3 agentservice[2101]: 2026/11/05 09:03:49 INFO [LOCKDOWN] Runner.Worker PID set module=armour pid=1971
+2026-11-05T09:04:44.6676156Z Nov 05 09:03:53 runnervm48cm3 systemd[1]: /etc/systemd/system/agent.service:9: Standard output type syslog is obsolete, automatically updating to journal. Please update your unit file, and consider removing the setting altogether.
+2026-11-05T09:04:44.6677239Z Nov 05 09:03:53 runnervm48cm3 systemd[1]: /etc/systemd/system/agent.service:10: Standard output type syslog is obsolete, automatically updating to journal. Please update your unit file, and consider removing the setting altogether.
+2026-11-05T09:04:44.6677949Z 
+2026-11-05T09:04:44.8886143Z Cleaning up orphan processes

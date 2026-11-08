@@ -1,0 +1,44 @@
+name: Template
+
+# Once a week, and by hand from the Actions tab: brings what changed in the
+# template of this repository, which .github/template.json names, as one pull
+# request of the branch template-sync, with PAGER_FIX_TOKEN, and tells the pager
+# with a report. The files that `own` there lists, such as the README and the voice
+# of the drafts, stay as they are. Without PAGER_FIX_TOKEN, or when GitHub refuses
+# it, the run fails and its summary lists what waits, so that GitHub tells the
+# owner. The template itself takes nothing. No Claude runs here, and it takes about
+# a minute of Actions a week. README.md describes the way.
+
+on:
+  schedule:
+    - cron: "41 5 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: template
+  cancel-in-progress: false
+
+jobs:
+  take:
+    name: Take the changes of the template
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Bring the changes of the template as a pull request
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PAGER_FIX_TOKEN: ${{ secrets.PAGER_FIX_TOKEN }}
+          PAGER_URL: ${{ vars.PAGER_URL }}
+          PAGER_CONTROL_SECRET: ${{ secrets.PAGER_CONTROL_SECRET }}
+          PAGER_LANGUAGE: ${{ vars.PAGER_LANGUAGE }}
+        run: node pager/job.mjs template

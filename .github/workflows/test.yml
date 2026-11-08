@@ -1,0 +1,47 @@
+name: Tests
+
+# The tests of the job scripts with every line, branch and function covered, the
+# lint and format of the code, and the checks of the workflows: actionlint, and
+# zizmor for the ways a workflow gets attacked. The tools run from images pinned by
+# their digest, so that no action of a third party runs here.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Tests, lint and workflows
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Tests
+        run: npm test
+      - name: Lint and format
+        if: ${{ !cancelled() }}
+        run: npm run lint
+      - name: Lint the workflows
+        if: ${{ !cancelled() }}
+        env:
+          ACTIONLINT: rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+        run: docker run --rm --volume "$PWD:/repo" --workdir /repo "$ACTIONLINT"
+      - name: Audit the workflows
+        if: ${{ !cancelled() }}
+        env:
+          ZIZMOR: ghcr.io/zizmorcore/zizmor:1.31.1@sha256:42d409dbb851d4c5d35a058cf042b828bea1e3f2884378c526eb0974780e18d9
+        run: docker run --rm --volume "$PWD:/repo" --workdir /repo "$ZIZMOR" --offline --format github .github/workflows

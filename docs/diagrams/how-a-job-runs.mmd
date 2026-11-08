@@ -1,0 +1,29 @@
+---
+config:
+  flowchart:
+    wrappingWidth: 400
+---
+flowchart TB
+    accTitle: How a job of the pager runs
+    accDescr: You press Draft a reply or Start fix, or write a text, and the pager's Worker sends an event to this private repository. The job prepare checks the event and collects what Claude reads, with the read-only token of the workflow. The job ask runs Claude Code with your subscription on the egress-firewall runner; Claude only reads, and in a fix edits a checkout. For a fix with a change, the job pull-request opens a pull request with PAGER_FIX_TOKEN, on another machine. The job answer checks Claude's answer against the allowlist and sends it to the Worker, signed. The Worker shows it in Telegram: a draft with Send, a note, or a proposal with one Confirm button, which acts only when you press it.
+
+    you["You press ✍️ Draft a reply or 🛠 Start fix, or write a text"]
+    worker["`**The pager's Worker** sends an event, with a token of its app for this repository alone`"]
+    prepare["`**prepare** checks the event and collects what Claude reads, read-only`"]
+    ask["`**ask**: Claude Code with your subscription, on the egress-firewall runner; it only reads, and in a fix edits a checkout`"]
+    pull["`**pull-request**, a fix only: one signed commit and a pull request, with PAGER_FIX_TOKEN, on another machine`"]
+    answer["`**answer** checks Claude's answer against the allowlist and sends it, signed`"]
+    telegram["`**Telegram**: a draft with ✅ Send, a note, or a proposal with ✅ Confirm`"]
+
+    you --> worker --> prepare --> ask
+    ask -- "a change" --> pull --> answer
+    ask -- "an answer" --> answer
+    answer -- "POST /control" --> telegram
+    telegram -- "only a press acts" --> you
+
+    classDef you fill:#f59e0b2e,stroke:#f59e0b,stroke-width:2px
+    classDef bot fill:#526cfe2e,stroke:#526cfe,stroke-width:2px
+    classDef done fill:#16a34a2e,stroke:#16a34a,stroke-width:2px
+    class you you
+    class worker,prepare,ask,pull,answer bot
+    class telegram done

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.6.4/schema.json",
+  "files": {
+    "includes": [
+      "pager/**/*.mjs",
+      "scripts/**/*.mjs",
+      "test/**/*.mjs",
+      "*.json"
+    ]
+  },
+  "formatter": { "indentStyle": "space", "indentWidth": 2 }
+}

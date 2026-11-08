@@ -1,0 +1,2 @@
+# Text with LF line endings everywhere, also in checkouts on Windows.
+* text=auto eol=lf

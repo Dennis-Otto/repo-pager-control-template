@@ -1,0 +1,177 @@
+name: Pager
+
+# The jobs of the maintainer's own Repo Pager (https://github.com/Dennis-Otto/repo-pager).
+# Its Worker sends an event for a button or a free text, with a token of its
+# GitHub App for this repository alone; this workflow answers it at /control of
+# the Worker, signed. README.md describes the contract and the set-up.
+#
+# prepare        checks the event and collects what Claude reads, read-only
+# ask            runs Claude (ask.yml): it only reads, and in a fix edits a checkout
+# pull-request   a fix only: makes Claude's change a pull request, with PAGER_FIX_TOKEN
+# answer         checks Claude's answer and sends it to the pager
+#
+# Each job runs on its own machine, and the secrets that write never meet Claude.
+# A job of the Actions tab, by hand, is a free text, to try the pager.
+
+on:
+  repository_dispatch:
+    types: [pager-text, pager-draft, pager-fix]
+  workflow_dispatch:
+    inputs:
+      text:
+        description: A text, as if written to the pager
+        type: string
+        required: true
+      language:
+        description: The language of the answer, as LANGUAGE of the pager's Worker
+        type: choice
+        options: [en, de]
+        default: en
+
+permissions: {}
+
+# One job of a thing at a time; each free text runs on its own.
+concurrency:
+  group: pager-${{ github.event.client_payload.item || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Prepare the job
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      job: ${{ steps.prepare.outputs.job }}
+      kind: ${{ steps.prepare.outputs.kind }}
+      repo: ${{ steps.prepare.outputs.repo }}
+      tools: ${{ steps.prepare.outputs.tools }}
+      turns: ${{ steps.prepare.outputs.turns }}
+      budget: ${{ steps.prepare.outputs.budget }}
+      model: ${{ steps.prepare.outputs.model }}
+      effort: ${{ steps.prepare.outputs.effort }}
+      schema: ${{ steps.prepare.outputs.schema }}
+      error: ${{ steps.prepare.outputs.error }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      # The token of the workflow reads the public repositories of the owner: the
+      # thread of a contribution, the logs of what fails, the state of each main.
+      - name: Check the event and collect what Claude reads
+        id: prepare
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PAGER_INPUT: pager-input
+        run: node pager/job.mjs prepare
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pager-input
+          path: pager-input/
+          retention-days: 3
+          if-no-files-found: error
+
+  ask:
+    name: Ask Claude
+    needs: prepare
+    # Without its data, such as the thread of a draft, the answer says why.
+    if: needs.prepare.outputs.error == ''
+    permissions:
+      contents: read
+    # The path that actionlint knows; the syntax $/ is newer than actionlint.
+    uses: ./.github/workflows/ask.yml # zizmor: ignore[self-repository]
+    with:
+      kind: ${{ needs.prepare.outputs.kind }}
+      repo: ${{ needs.prepare.outputs.repo }}
+      tools: ${{ needs.prepare.outputs.tools }}
+      turns: ${{ needs.prepare.outputs.turns }}
+      budget: ${{ needs.prepare.outputs.budget }}
+      model: ${{ needs.prepare.outputs.model }}
+      effort: ${{ needs.prepare.outputs.effort }}
+      schema: ${{ needs.prepare.outputs.schema }}
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+  pull-request:
+    name: Open the pull request of the fix
+    needs: [prepare, ask]
+    if: needs.ask.outputs.changed == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      url: ${{ steps.pull.outputs.url }}
+      error: ${{ steps.pull.outputs.error }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The commit that Claude saw, fresh: the patch is all that comes from there.
+      - name: Check out the repository of the fix
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ needs.prepare.outputs.repo }}
+          ref: ${{ needs.ask.outputs.base }}
+          path: repo
+          persist-credentials: false
+      - name: Get the change of the fix
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: pager-fix
+          path: fix
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Open the pull request
+        id: pull
+        env:
+          JOB: ${{ needs.prepare.outputs.job }}
+          PLAN: ${{ needs.ask.outputs.plan }}
+          BASE: ${{ needs.ask.outputs.base }}
+          PAGER_FIX_TOKEN: ${{ secrets.PAGER_FIX_TOKEN }}
+          PAGER_REPO: repo
+          PAGER_PATCH: ${{ github.workspace }}/fix/fix.patch
+        run: node pager/job.mjs pull-request
+
+  answer:
+    name: Answer the pager
+    needs: [prepare, ask, pull-request]
+    # Also when Claude failed: the pager then says why, and brings its button back.
+    if: always() && needs.prepare.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      # Missing when Claude didn't start; the answer then has no usage.
+      - name: Get the transcript of Claude
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: pager-transcript
+          path: transcript
+      - name: Send the answer to the pager, signed
+        env:
+          JOB: ${{ needs.prepare.outputs.job }}
+          PREPARE_ERROR: ${{ needs.prepare.outputs.error }}
+          ASK_RESULT: ${{ needs.ask.result }}
+          PLAN: ${{ needs.ask.outputs.plan }}
+          CHANGED: ${{ needs.ask.outputs.changed }}
+          PULL_URL: ${{ needs.pull-request.outputs.url }}
+          PULL_ERROR: ${{ needs.pull-request.outputs.error }}
+          PAGER_TRANSCRIPT: transcript
+          PAGER_URL: ${{ vars.PAGER_URL }}
+          PAGER_CONTROL_SECRET: ${{ secrets.PAGER_CONTROL_SECRET }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node pager/job.mjs answer

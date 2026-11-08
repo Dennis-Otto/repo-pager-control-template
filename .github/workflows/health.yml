@@ -1,0 +1,46 @@
+name: Health
+
+# Once a day, and by hand from the Actions tab: asks the pager's Worker for its
+# health with the signed body {"type": "health"}, and fails, with an error that
+# names it, when the pager doesn't answer, its schedule stopped, Telegram refuses the
+# bot or its webhook failed in the last day, GitHub refuses the app, or a token
+# expires within a week. The pager writes only when something needs the maintainer, so
+# a quiet day can't tell that it is dead; GitHub notifies the maintainer of a failed run of a
+# schedule by itself, which works also when Telegram or the Worker is what broke. It
+# also reads the day on which PAGER_FIX_TOKEN expires from GitHub, with
+# GET /rate_limit, and sends it along, for the reminder of the pager. No Claude runs
+# here, and it takes about a minute of Actions a day.
+
+on:
+  schedule:
+    - cron: "23 6 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: health
+  cancel-in-progress: false
+
+jobs:
+  health:
+    name: Check the pager
+    # The template has no pager to check; every control repository made from it has.
+    if: github.repository != 'Dennis-Otto/repo-pager-control-template'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Ask the pager for its health, signed
+        env:
+          PAGER_URL: ${{ vars.PAGER_URL }}
+          PAGER_CONTROL_SECRET: ${{ secrets.PAGER_CONTROL_SECRET }}
+          PAGER_FIX_TOKEN: ${{ secrets.PAGER_FIX_TOKEN }}
+        run: node pager/job.mjs health

@@ -1,0 +1,15 @@
+# Dependabot keeps the pinned actions current: a pull request per update, which the
+# tests check and the maintainer merges. The repository has no other dependencies.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ["*"]
