@@ -164,6 +164,37 @@ async function treeOf(api, repo, sha) {
   return filesOf(await api.get(`/repos/${repo}/git/trees/${sha}?recursive=1`));
 }
 
+/** The address of the last page in a header Link of GitHub, or null. */
+export function lastPage(link) {
+  return (
+    /<[^>]*[?&]page=(\d+)[^>]*>;\s*rel="last"/.exec(link ?? "")?.[1] ?? null
+  );
+}
+
+/**
+ * The files of the template at the commit that a repository was made from, before
+ * its first take: "Use this template" copies the tree of the template's latest
+ * commit into the repository's first commit, so the template's newest commit up
+ * to that date with the same tree is it. An empty map when none has that tree.
+ */
+async function originOf(api, repo, here, template, source) {
+  const path = `/repos/${repo}/commits?sha=${here.branch}&per_page=1`;
+  const response = await api.request("GET", path);
+  const last = lastPage(response.headers.get("link"));
+  const [root] =
+    last === null
+      ? await response.json()
+      : await api.get(`${path}&page=${last}`);
+  const until = encodeURIComponent(root.commit.committer.date);
+  const commits = await api.get(
+    `/repos/${template}/commits?sha=${source.branch}&until=${until}&per_page=100`,
+  );
+  const match = commits.find(
+    (entry) => entry.commit.tree.sha === root.commit.tree.sha,
+  );
+  return match === undefined ? new Map() : treeOf(api, template, match.sha);
+}
+
 /**
  * Find what the template of a repository changed, and bring it as one pull request
  * when `write` is true. Returns the state, `current`, `waiting` (changes and no
@@ -184,7 +215,9 @@ export async function takeTemplate({ api, repo, write }) {
   const source = await tipOf(api, template);
   const latest = await treeOf(api, template, source.sha);
   let before = new Map();
-  if (commit !== "") {
+  if (commit === "") {
+    before = await originOf(api, repo, here, template, source);
+  } else {
     before = await treeOf(api, template, commit).catch((error) => {
       // A commit that the template no longer has: only its deletions are lost.
       if (error?.status === 404 || error?.status === 422) {

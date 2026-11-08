@@ -1,5 +1,5 @@
 {
   "template": "Dennis-Otto/repo-pager-control-template",
   "commit": "",
-  "own": ["README.md", "pager/voice.md"]
+  "own": [".github/dependabot.yml", "README.md", "pager/voice.md"]
 }

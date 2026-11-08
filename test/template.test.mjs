@@ -15,6 +15,7 @@ import {
   changesOf,
   filesOf,
   isOwn,
+  lastPage,
   pullBody,
   reportOf,
   SETTINGS,
@@ -395,9 +396,53 @@ describe("the pull request of the template", () => {
     assert.deepEqual(await take(net), { state: "template", template: HOME });
   });
 
-  it("deletes nothing before the first take, or when the template lost the commit", async () => {
-    const first = await take(github({ here: settings({ commit: "" }) }));
-    assert.deepEqual(first.changes.remove, []);
+  it("deletes before the first take what the template lost since the copy", async () => {
+    const ROOT = sha("e");
+    const DATE = "2026-11-01T10:00:00Z";
+    const commit = (id, tree) => ({
+      sha: id,
+      commit: { tree: { sha: tree }, committer: { date: DATE } },
+    });
+    const world = ({ link, templateCommits }) => {
+      const net = github({ here: settings({ commit: "" }) });
+      net
+        .on("GET", `/repos/${HOME}/commits?sha=main&per_page=1`, () => {
+          const headers = link === undefined ? {} : { link };
+          return Response.json([commit(HEAD, "tree-head")], { headers });
+        })
+        .on("GET", `/repos/${HOME}/commits?sha=main&per_page=1&page=3`, () =>
+          json([commit(ROOT, "tree-old")]),
+        )
+        .on(
+          "GET",
+          `/repos/${TEMPLATE}/commits?sha=main&until=${encodeURIComponent(DATE)}&per_page=100`,
+          () => json(templateCommits),
+        );
+      return net;
+    };
+    const copied = await take(
+      world({
+        link: `<https://api.github.com/repositories/1/commits?sha=main&per_page=1&page=2>; rel="next", <https://api.github.com/repositories/1/commits?sha=main&per_page=1&page=3>; rel="last"`,
+        templateCommits: [
+          commit(sha("f"), "tree-new"),
+          commit(OLD, "tree-old"),
+        ],
+      }),
+    );
+    assert.deepEqual(copied.changes, CHANGES);
+    const unknown = await take(
+      world({ templateCommits: [commit(OLD, "tree-old")] }),
+    );
+    assert.deepEqual(unknown.changes.remove, []);
+  });
+
+  it("reads the last page of a header Link", () => {
+    assert.equal(lastPage('<https://x/y?per_page=1&page=7>; rel="last"'), "7");
+    assert.equal(lastPage('<https://x/y?page=2>; rel="next"'), null);
+    assert.equal(lastPage(null), null);
+  });
+
+  it("deletes nothing when the template lost the commit", async () => {
     for (const status of [404, 422]) {
       const result = await take(
         github({ oldTree: () => json({ message: "No commit" }, status) }),

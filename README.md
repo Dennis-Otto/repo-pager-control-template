@@ -18,7 +18,13 @@ CONTROL=octocat/repo-pager-control
 gh repo create "$CONTROL" --private --template Dennis-Otto/repo-pager-control-template
 ```
 
-The new repository has every file of the template, in one commit, and no history of it. Then give it its secrets and variables:
+The new repository has every file of the template, in one commit, and no history of it. Delete its `.github/dependabot.yml`: the template's Dependabot keeps the actions current and the pull request of the workflow *Template* brings them to you, while bumps of your own would only fight it, since that pull request takes each changed workflow back to the template's pins. The template lists the file in its `own`, so it never comes back:
+
+```sh
+gh api -X DELETE "repos/$CONTROL/contents/.github/dependabot.yml"   -f message="chore: the template keeps the actions current"   -f sha="$(gh api "repos/$CONTROL/contents/.github/dependabot.yml" --jq .sha)"
+```
+
+Then give it its secrets and variables:
 
 | Name | Kind | Needed | What it is |
 | --- | --- | --- | --- |
@@ -139,13 +145,13 @@ This template is the one source of the code of every control repository, so a fi
 {
   "template": "Dennis-Otto/repo-pager-control-template",
   "commit": "",
-  "own": ["README.md", "pager/voice.md"]
+  "own": [".github/dependabot.yml", "README.md", "pager/voice.md"]
 }
 ```
 
-The workflow [Template](.github/workflows/template.yml) runs every Monday, and by hand from the Actions tab. It compares the files of your default branch with those of the template's newest commit, and brings each file that differs, and deletes each that the template deleted since the commit taken last, as one pull request of the branch `template-sync`, titled *chore: take the template up to …*. Its one commit comes through the API, which GitHub signs, with `PAGER_FIX_TOKEN`, since only a token with *Workflows* may change a workflow; the pull request runs the tests of your repository, and you merge it. A newer change of the template comes onto the same branch and pull request, and the pager gets a report, *🧾 Run: Template …*, with the link, in the language of `PAGER_LANGUAGE`.
+The workflow [Template](.github/workflows/template.yml) runs every Monday, and by hand from the Actions tab. It compares the files of your default branch with those of the template's newest commit, and brings each file that differs, and deletes each that the template deleted since the commit taken last, or, before the first, since the commit that your repository was made from, as one pull request of the branch `template-sync`, titled *chore: take the template up to …*. Its one commit comes through the API, which GitHub signs, with `PAGER_FIX_TOKEN`, since only a token with *Workflows* may change a workflow; the pull request runs the tests of your repository, and you merge it. A newer change of the template comes onto the same branch and pull request, and the pager gets a report, *🧾 Run: Template …*, with the link, in the language of `PAGER_LANGUAGE`.
 
-- **Your files stay yours:** each path of `own`, or each folder with a slash at its end, the `own` of the template, and every file that the template never had, such as a workflow of your own. The template names `README.md` and `pager/voice.md`; add a file that you change on purpose.
+- **Your files stay yours:** each path of `own`, or each folder with a slash at its end, the `own` of the template, and every file that the template never had, such as a workflow of your own. The template names `.github/dependabot.yml`, `README.md` and `pager/voice.md`; add a file that you change on purpose.
 - **Everything else is the template's:** a file of the template that your repository changed goes back to the template's with the next pull request, which shows it in its diff. Propose a change that every control repository needs to the template, or keep the file apart in `own`.
 - **Without `PAGER_FIX_TOKEN`,** or when GitHub refuses it, the run fails and lists what waits in its summary, so that GitHub tells you; give the token this repository too.
 
@@ -155,6 +161,7 @@ The workflow [Template](.github/workflows/template.yml) runs every Monday, and b
 - **Claude only proposes.** Its answer is JSON of a schema, checked twice: by Claude Code and by the job `answer` against the same allowlist as the pager's buttons. ✅ **Send** and ✏️ **Edit** can't be proposed; they stay with the message of the draft, which shows the text they post. Nothing is posted in your name without your press.
 - **Start fix** is the one job that writes to your other repositories: a branch and a pull request, never a merge, through the rules of the target repository.
 - **Pinned and few:** every action is pinned to a commit; besides GitHub's own, only `anthropics/claude-code-action` runs. Harden-Runner would block hosts only with a paid plan in a private repository, so the firewall runner does that. The tests run actionlint and zizmor from images pinned by their digest, and Dependabot keeps the actions current.
+- **You trust the template's `main` as an automatic update:** the pull request of the workflow *Template* comes from a branch of your repository, so its checks run the template's new workflows and scripts with your repository's secrets, `CLAUDE_CODE_OAUTH_TOKEN`, `PAGER_CONTROL_SECRET` and `PAGER_FIX_TOKEN` among them, before you have read it. Merging it is your review of what stays; the checks have run by then. A copy that won't trust the template that far turns the workflow *Template* off and takes its changes by hand.
 - **Least permissions:** every workflow starts with `permissions: {}`, and each job gets `contents: read` at most.
 
 [SECURITY.md](SECURITY.md) says how to report a vulnerability.
