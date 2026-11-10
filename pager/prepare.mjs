@@ -2,10 +2,11 @@
 // reads into one folder, with the read-only token of the workflow. Claude's job
 // gets that folder and the checkout of the repository, nothing else; it reaches
 // no API of GitHub itself.
+import { randomBytes } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { LIMITS, readJob, schema, task } from "./core.mjs";
+import { LIMITS, PROMPT, readJob, schema, task } from "./core.mjs";
 import { GitHubError } from "./github.mjs";
 
 /**
@@ -673,30 +674,37 @@ export async function prepare({ eventName, event, owner, api, out, read }) {
       error = `the thread didn't come from GitHub: ${failure.message}`;
     }
     files["voice.md"] = await read("voice.md");
-  } else {
+  } else if (job.kind === "fix") {
     const found = await failures(api, job);
     files["failures.json"] = JSON.stringify(found.entries, null, 1);
     Object.assign(files, found.logs);
   }
-  files["task.md"] = task(job, Object.keys(files).sort());
+  // A translation has no tool to read a file with: its task holds its notes, between
+  // lines that no note can hold, and is its prompt; data/task.md keeps it for the
+  // maintainer, who may look at what Claude got.
+  const data = `notes-${randomBytes(8).toString("hex")}`;
+  files["task.md"] = task(job, Object.keys(files).sort(), data);
   files["rules.md"] = await read("rules.md");
   await mkdir(join(out, "logs"), { recursive: true });
   for (const [name, content] of Object.entries(files)) {
     await writeFile(join(out, name), content);
   }
   // The outputs name the job for the jobs after this one. The thing of a text is
-  // data for Claude alone; the item of a draft or a fix is the thing that its
-  // answer goes back to, into the thing's topic, so it stays.
+  // data for Claude alone; the item of a draft, a fix or a translation is the thing
+  // that its answer goes back to, so it stays. A translation reads no checkout: its
+  // notes are all that it needs.
   const { text: _text, reply: _reply, item, ...rest } = job;
   const named = job.kind === "text" ? rest : { ...rest, item };
+  const translates = job.kind === "translate";
   return {
     job,
     outputs: {
       job: JSON.stringify(named),
       kind: job.kind,
-      repo: job.repo ?? "",
+      repo: translates ? "" : (job.repo ?? ""),
       ...LIMITS[job.kind],
-      schema: JSON.stringify(schema(job.kind)),
+      schema: JSON.stringify(schema(job.kind, job.lines?.length)),
+      prompt: translates ? files["task.md"] : PROMPT,
       error,
     },
   };

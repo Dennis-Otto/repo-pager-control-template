@@ -311,6 +311,90 @@ describe("answer", () => {
     assert.equal(code, 0);
     assert.match(w.lines[0], /^Not sent: the variable PAGER_URL/);
   });
+
+  describe("of a translation", () => {
+    const JOB = JSON.stringify({
+      kind: "translate",
+      item: ITEM,
+      repo: REPO,
+      of: "0a1b2c3d",
+      lines: ["the pager speaks German", "bump anchore/syft (#4)"],
+      language: "de",
+    });
+
+    it("sends the lines that keep their notes, signed, and shows them in the summary", async () => {
+      const net = new Net().on(
+        "POST",
+        "/control",
+        () => new Response("translated"),
+      );
+      const w = await world(net);
+      const { code } = await answer(w, {
+        JOB,
+        PLAN: JSON.stringify({
+          lines: ["Der Pager spricht Deutsch", "anchore/syft angehoben (#4)"],
+        }),
+      });
+      assert.equal(code, 0);
+      assert.deepEqual(net.calls[0].body, {
+        type: "translation",
+        item: ITEM,
+        of: "0a1b2c3d",
+        lines: ["Der Pager spricht Deutsch", "anchore/syft angehoben (#4)"],
+      });
+      assert.match(net.calls[0].headers["x-pager-signature"], /^sha256=/);
+      assert.deepEqual(w.lines, ["The pager answered: translated"]);
+      assert.match(
+        await w.read("summary"),
+        /^### The translation for the pager\n\n```json\n\{\n {2}"type": "translation"/,
+      );
+    });
+
+    it("sends nothing for a translation that lost a name or didn't come to be, and warns", async () => {
+      const cases = [
+        [
+          { PLAN: JSON.stringify({ lines: ["Deutsch", "syft (#4)"] }) },
+          'line 2 of the translation lost "anchore/syft"',
+        ],
+        [
+          { ASK_RESULT: "failure", PLAN: undefined },
+          "the step of Claude failed",
+        ],
+      ];
+      for (const [fields, why] of cases) {
+        const net = new Net();
+        const w = await world(net);
+        const { code } = await answer(w, { JOB, ...fields });
+        assert.equal(code, 0);
+        assert.equal(net.calls.length, 0);
+        assert.deepEqual(w.lines, [
+          `::warning::No translation for the pager: ${why}.`,
+          "Nothing sent: the message of the release keeps its notes in English.",
+        ]);
+        assert.equal(
+          await w.read("summary"),
+          `### No translation for the pager\n\nThe message of the release keeps its notes in English: ${why}.\n`,
+        );
+      }
+    });
+
+    it("fails the step when the pager refuses the translation", async () => {
+      const net = new Net().on(
+        "POST",
+        "/control",
+        () => new Response("Unprocessable Content", { status: 422 }),
+      );
+      const w = await world(net);
+      const { code } = await answer(w, {
+        JOB,
+        PLAN: JSON.stringify({
+          lines: ["Der Pager spricht Deutsch", "anchore/syft angehoben (#4)"],
+        }),
+      });
+      assert.equal(code, 1);
+      assert.match(w.lines[0], /^::error::Not sent: the pager found/);
+    });
+  });
 });
 
 describe("forward", () => {

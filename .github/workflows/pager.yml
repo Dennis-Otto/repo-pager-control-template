@@ -1,21 +1,24 @@
 name: Pager
 
 # The jobs of the maintainer's own Repo Pager (https://github.com/Dennis-Otto/repo-pager).
-# Its Worker sends an event for a button or a free text, with a token of its
-# GitHub App for this repository alone; this workflow answers it at /control of
-# the Worker, signed. README.md describes the contract and the set-up.
+# Its Worker sends an event for a button or a free text, and for the notes of a
+# release to translate into its language, with a token of its GitHub App for this
+# repository alone; this workflow answers it at /control of the Worker, signed.
+# README.md describes the contract and the set-up.
 #
 # prepare        checks the event and collects what Claude reads, read-only
-# ask            runs Claude (ask.yml): it only reads, and in a fix edits a checkout
+# ask            runs Claude (ask.yml): it only reads, in a fix edits a checkout,
+#                and in a translation has no tool at all
 # pull-request   a fix only: makes Claude's change a pull request, with PAGER_FIX_TOKEN
-# answer         checks Claude's answer and sends it to the pager
+# answer         checks Claude's answer and sends it to the pager; a translation
+#                that doesn't keep its notes sends nothing
 #
 # Each job runs on its own machine, and the secrets that write never meet Claude.
 # A job of the Actions tab, by hand, is a free text, to try the pager.
 
 on:
   repository_dispatch:
-    types: [pager-text, pager-draft, pager-fix]
+    types: [pager-text, pager-draft, pager-fix, pager-translate]
   workflow_dispatch:
     inputs:
       text:
@@ -52,6 +55,7 @@ jobs:
       model: ${{ steps.prepare.outputs.model }}
       effort: ${{ steps.prepare.outputs.effort }}
       schema: ${{ steps.prepare.outputs.schema }}
+      prompt: ${{ steps.prepare.outputs.prompt }}
       error: ${{ steps.prepare.outputs.error }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -93,6 +97,7 @@ jobs:
       model: ${{ needs.prepare.outputs.model }}
       effort: ${{ needs.prepare.outputs.effort }}
       schema: ${{ needs.prepare.outputs.schema }}
+      prompt: ${{ needs.prepare.outputs.prompt }}
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 

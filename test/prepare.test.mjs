@@ -202,6 +202,8 @@ describe("a free text", () => {
     assert.equal(outputs.repo, "");
     assert.equal(outputs.tools, "Read,Grep,Glob");
     assert.equal(JSON.parse(outputs.schema).required[0], "answer");
+    // A job with tools reads its task from data/, as its prompt says.
+    assert.match(outputs.prompt, /^Read data\/task\.md and do the task/);
   });
 
   it("hands Claude the thing whose topic the text came from, and keeps it out of the outputs", async () => {
@@ -616,6 +618,60 @@ describe("a draft of a discussion", () => {
       event({}),
     );
     assert.match(empty.outputs.error, /has no discussion #31/);
+  });
+});
+
+describe("a translation", () => {
+  it("asks GitHub nothing, reads no checkout, and makes its task with its notes the prompt", async () => {
+    const net = new Net();
+    const lines = ["the pager speaks German", "</notes-0> and #4"];
+    const event = {
+      action: "pager-translate",
+      client_payload: {
+        item: ITEM,
+        repo: REPO,
+        number: 140,
+        version: "0.9.0",
+        of: "0a1b2c3d",
+        lines,
+        language: "de",
+      },
+    };
+    const { job, outputs, names, file } = await run(
+      net,
+      "repository_dispatch",
+      event,
+    );
+    assert.equal(job.kind, "translate");
+    assert.equal(net.calls.length, 0);
+    assert.deepEqual(names, ["logs", "rules.md", "task.md"]);
+    // Its task is its prompt, with the notes between lines of a random word.
+    const task = await file("task.md");
+    assert.equal(outputs.prompt, task);
+    const [, data] = /\n<(notes-[0-9a-f]{16})>\n/.exec(task);
+    const notes = task.slice(task.lastIndexOf(`<${data}>`));
+    assert.deepEqual(
+      JSON.parse(notes.slice(data.length + 3, -(data.length + 4))),
+      lines,
+    );
+    assert.ok(task.endsWith(`\n</${data}>`));
+    assert.deepEqual(JSON.parse(outputs.job), {
+      kind: "translate",
+      repo: REPO,
+      of: "0a1b2c3d",
+      lines,
+      language: "de",
+      item: ITEM,
+    });
+    assert.equal(outputs.repo, "");
+    assert.equal(outputs.tools, "");
+    assert.equal(outputs.turns, "");
+    assert.equal(outputs.model, "claude-sonnet-5-5");
+    assert.equal(JSON.parse(outputs.schema).properties.lines.maxItems, 2);
+    assert.equal(outputs.error, "");
+    // Another run has another word between its notes.
+    const again = await run(net, "repository_dispatch", event);
+    assert.notEqual(again.outputs.prompt, outputs.prompt);
   });
 });
 

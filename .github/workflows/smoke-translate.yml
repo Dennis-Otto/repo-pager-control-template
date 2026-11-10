@@ -1,0 +1,150 @@
+name: Smoke test of a translation
+
+# Proves in a pull request that changes the jobs of Claude that a translation still
+# runs as it should: Claude Code gets no tool but the one of its answer, through
+# --tools with an empty value, and its prompt holds the notes. It translates one
+# line into German, a tiny part of the weekly limit, and sends it to nobody. A
+# workflow of its own beside smoke.yml, since each run of ask.yml keeps its data
+# and its transcript under the same names. By hand from the Actions tab as well.
+
+on:
+  pull_request:
+    paths:
+      - .github/egress-firewall.yaml
+      - .github/workflows/ask.yml
+      - .github/workflows/pager.yml
+      - .github/workflows/smoke-translate.yml
+      - pager/**
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: smoke-translate-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  prepare:
+    name: Prepare the smoke test of a translation
+    # As in smoke.yml: neither Dependabot's pull requests nor the template have a
+    # token of Claude, so each control repository runs this test.
+    if: github.actor != 'dependabot[bot]' && github.repository != 'Dennis-Otto/repo-pager-control-template'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      job: ${{ steps.prepare.outputs.job }}
+      tools: ${{ steps.prepare.outputs.tools }}
+      turns: ${{ steps.prepare.outputs.turns }}
+      budget: ${{ steps.prepare.outputs.budget }}
+      model: ${{ steps.prepare.outputs.model }}
+      effort: ${{ steps.prepare.outputs.effort }}
+      schema: ${{ steps.prepare.outputs.schema }}
+      prompt: ${{ steps.prepare.outputs.prompt }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      # The event that the pager sends for the notes of a release, for the pager's
+      # own repository of the owner of this one.
+      - name: Write the event of a translation
+        env:
+          REPO: ${{ github.repository_owner }}/repo-pager
+        run: |
+          set -euo pipefail
+          jq -n --arg repo "$REPO" '{
+            action: "pager-translate",
+            client_payload: {
+              item: "i0123456789abcde",
+              repo: $repo,
+              of: "0123abcd",
+              language: "de",
+              lines: ["Fixes #12 in `check.sh`, which now reads the logs of anchore/syft."]
+            }
+          }' > "$RUNNER_TEMP/event.json"
+      - name: Prepare the translation
+        id: prepare
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PAGER_EVENT_NAME: repository_dispatch
+          PAGER_EVENT_PATH: ${{ runner.temp }}/event.json
+          PAGER_INPUT: pager-input
+        run: node pager/job.mjs prepare
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pager-input
+          path: pager-input/
+          retention-days: 1
+          if-no-files-found: error
+
+  ask:
+    name: Ask Claude for the translation
+    needs: prepare
+    permissions:
+      contents: read
+    # The path that actionlint knows; the syntax $/ is newer than actionlint.
+    uses: ./.github/workflows/ask.yml # zizmor: ignore[self-repository]
+    with:
+      kind: translate
+      tools: ${{ needs.prepare.outputs.tools }}
+      turns: ${{ needs.prepare.outputs.turns }}
+      budget: ${{ needs.prepare.outputs.budget }}
+      model: ${{ needs.prepare.outputs.model }}
+      effort: ${{ needs.prepare.outputs.effort }}
+      schema: ${{ needs.prepare.outputs.schema }}
+      prompt: ${{ needs.prepare.outputs.prompt }}
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+  check:
+    name: Check the translation
+    needs: [prepare, ask]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Get the transcript of Claude
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: pager-transcript
+          path: transcript
+      # The same check as the answer job of pager.yml, and the tools with which
+      # Claude Code started: none built in but StructuredOutput, the answer itself.
+      - name: Check the lines and the tools of Claude
+        env:
+          JOB: ${{ needs.prepare.outputs.job }}
+          PLAN: ${{ needs.ask.outputs.plan }}
+        run: |
+          set -euo pipefail
+          # The template strings of JavaScript, which the shell leaves as they are.
+          # shellcheck disable=SC2016
+          node --input-type=module -e '
+            import { readdirSync, readFileSync } from "node:fs";
+            import { readTranslation } from "./pager/core.mjs";
+            const lines = readTranslation(JSON.parse(process.env.JOB), process.env.PLAN);
+            console.log(`Claude translated: ${JSON.stringify(lines)}`);
+            const file = readdirSync("transcript").find((name) => name.endsWith(".json"));
+            const messages = JSON.parse(readFileSync(`transcript/${file}`, "utf8"));
+            const init = messages.find((m) => m?.type === "system" && m?.subtype === "init");
+            if (!Array.isArray(init?.tools)) {
+              console.log("::error::The transcript names no tools of Claude Code, so the test cannot tell that a translation runs without them.");
+              process.exit(1);
+            }
+            console.log(`Claude Code started with the tools ${JSON.stringify(init.tools)}.`);
+            const builtIn = init.tools.filter((tool) => !tool.startsWith("mcp__") && tool !== "StructuredOutput");
+            if (builtIn.length > 0) {
+              console.log(`::error::A translation runs with the tools ${builtIn.join(", ")}: --tools with an empty value no longer leaves Claude Code without tools.`);
+              process.exit(1);
+            }
+          '
