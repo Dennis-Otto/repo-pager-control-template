@@ -64,6 +64,7 @@ describe("the delivery to the pager", () => {
       401: [true, /refused the signature/],
       400: [true, /same contract/],
       413: [true, /too long/],
+      422: [true, /translation doesn't fit the notes/],
       418: [true, /answered 418: teapot/],
     };
     for (const [status, [fatal, note]] of Object.entries(answers)) {

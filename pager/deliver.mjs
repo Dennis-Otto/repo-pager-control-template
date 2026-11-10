@@ -11,6 +11,7 @@ const REFUSALS = {
   404: "the pager has no such thing now",
   409: "the thing changed in between, so the pager left it as it is",
   413: "the answer is too long for the pager",
+  422: "the pager found that the translation doesn't fit the notes, which its check here should have found first: do the control repository and the Worker check the same?",
 };
 
 /** Wait, between two tries. */

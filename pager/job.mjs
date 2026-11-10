@@ -2,7 +2,8 @@
 //
 //   node pager/job.mjs prepare        check the event, collect what Claude reads
 //   node pager/job.mjs pull-request   open the pull request of a fix
-//   node pager/job.mjs answer         send the answer to the pager, signed
+//   node pager/job.mjs answer         send the answer to the pager, signed, or a
+//                                     translation that keeps its notes
 //   node pager/job.mjs forward        send a question or a report of an agent to
 //                                     the pager, signed (agents.yml)
 //   node pager/job.mjs health         ask the pager for its health, signed, and
@@ -20,7 +21,13 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { relay } from "./agents.mjs";
-import { answerBody, Refusal, readPlan, usageOf } from "./core.mjs";
+import {
+  answerBody,
+  Refusal,
+  readPlan,
+  translationBody,
+  usageOf,
+} from "./core.mjs";
 import { deliver } from "./deliver.mjs";
 import { GitHub } from "./github.mjs";
 import { check } from "./health.mjs";
@@ -55,6 +62,28 @@ async function transcript(folder) {
 
 function owner(env) {
   return env.PAGER_OWNER || env.GITHUB_REPOSITORY_OWNER;
+}
+
+/**
+ * Show a body in the summary of the run under its heading, and send it to the
+ * pager, signed: what the pager answered, or a refusal that fails the step.
+ */
+async function send(env, io, heading, body) {
+  await appendFile(
+    env.GITHUB_STEP_SUMMARY,
+    `### ${heading}\n\n\`\`\`json\n${JSON.stringify(body, null, 2)}\n\`\`\`\n`,
+  );
+  const result = await deliver({
+    url: env.PAGER_URL ?? "",
+    secret: env.PAGER_CONTROL_SECRET ?? "",
+    body,
+    fetcher: io.fetch,
+    sleep: io.sleep,
+  });
+  if (result.fatal) {
+    throw new Refusal(result.note);
+  }
+  return result.note;
 }
 
 const commands = {
@@ -95,56 +124,38 @@ const commands = {
   async answer(env, io) {
     const job = JSON.parse(env.JOB);
     const { usage, error } = usageOf(await transcript(env.PAGER_TRANSCRIPT));
-    const body = answerBody(
-      job,
-      {
-        ask: env.ASK_RESULT,
-        plan: env.PLAN ?? "",
-        usage,
-        error,
-        changed: env.CHANGED === "true",
-        pull: env.PULL_URL ?? "",
-        pullError: env.PULL_ERROR ?? "",
-        run: env.RUN_URL,
-        prepared: env.PREPARE_ERROR ?? "",
-      },
-      owner(env),
-    );
-    await appendFile(
-      env.GITHUB_STEP_SUMMARY,
-      `### The answer for the pager\n\n\`\`\`json\n${JSON.stringify(body, null, 2)}\n\`\`\`\n`,
-    );
-    const result = await deliver({
-      url: env.PAGER_URL ?? "",
-      secret: env.PAGER_CONTROL_SECRET ?? "",
-      body,
-      fetcher: io.fetch,
-      sleep: io.sleep,
-    });
-    if (result.fatal) {
-      throw new Refusal(result.note);
+    const outcome = {
+      ask: env.ASK_RESULT,
+      plan: env.PLAN ?? "",
+      usage,
+      error,
+      changed: env.CHANGED === "true",
+      pull: env.PULL_URL ?? "",
+      pullError: env.PULL_ERROR ?? "",
+      run: env.RUN_URL,
+      prepared: env.PREPARE_ERROR ?? "",
+    };
+    if (job.kind !== "translate") {
+      const body = answerBody(job, outcome, owner(env));
+      return send(env, io, "The answer for the pager", body);
     }
-    return result.note;
+    // Without a translation, the message keeps its English: a warning, no failure.
+    const { body, why } = translationBody(job, outcome);
+    if (body === null) {
+      await appendFile(
+        env.GITHUB_STEP_SUMMARY,
+        `### No translation for the pager\n\nThe message of the release keeps its notes in English: ${why}.\n`,
+      );
+      io.log(`::warning::No translation for the pager: ${why}.`);
+      return "Nothing sent: the message of the release keeps its notes in English.";
+    }
+    return send(env, io, "The translation for the pager", body);
   },
 
   async forward(env, io) {
     const event = JSON.parse(await readFile(env.GITHUB_EVENT_PATH, "utf8"));
     const body = relay(env.GITHUB_EVENT_NAME, event, owner(env));
-    await appendFile(
-      env.GITHUB_STEP_SUMMARY,
-      `### What goes to the pager\n\n\`\`\`json\n${JSON.stringify(body, null, 2)}\n\`\`\`\n`,
-    );
-    const result = await deliver({
-      url: env.PAGER_URL ?? "",
-      secret: env.PAGER_CONTROL_SECRET ?? "",
-      body,
-      fetcher: io.fetch,
-      sleep: io.sleep,
-    });
-    if (result.fatal) {
-      throw new Refusal(result.note);
-    }
-    return result.note;
+    return send(env, io, "What goes to the pager", body);
   },
 
   async health(env, io) {

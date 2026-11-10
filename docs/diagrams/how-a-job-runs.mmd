@@ -5,15 +5,15 @@ config:
 ---
 flowchart TB
     accTitle: How a job of the pager runs
-    accDescr: You press Draft a reply or Start fix, or write a text, and the pager's Worker sends an event to this private repository. The job prepare checks the event and collects what Claude reads, with the read-only token of the workflow. The job ask runs Claude Code with your subscription on the egress-firewall runner; Claude only reads, and in a fix edits a checkout. For a fix with a change, the job pull-request opens a pull request with PAGER_FIX_TOKEN, on another machine. The job answer checks Claude's answer against the allowlist and sends it to the Worker, signed. The Worker shows it in Telegram: a draft with Send, a note, or a proposal with one Confirm button, which acts only when you press it.
+    accDescr: You press Draft a reply or Start fix, or write a text, or a release comes whose notes need your language, and the pager's Worker sends an event to this private repository. The job prepare checks the event and collects what Claude reads, with the read-only token of the workflow. The job ask runs Claude Code with your subscription on the egress-firewall runner; Claude only reads, in a fix edits a checkout, and translates with no tool at all. For a fix with a change, the job pull-request opens a pull request with PAGER_FIX_TOKEN, on another machine. The job answer checks Claude's answer against the allowlist, and a translation against its notes, and sends it to the Worker, signed. The Worker shows it in Telegram: a draft with Send, a note, a proposal with one Confirm button, which acts only when you press it, or the notes of a release in your language.
 
-    you["You press ✍️ Draft a reply or 🛠 Start fix, or write a text"]
+    you["You press ✍️ Draft a reply or 🛠 Start fix, or write a text; or a release comes whose notes need your language"]
     worker["`**The pager's Worker** sends an event, with a token of its app for this repository alone`"]
     prepare["`**prepare** checks the event and collects what Claude reads, read-only`"]
-    ask["`**ask**: Claude Code with your subscription, on the egress-firewall runner; it only reads, and in a fix edits a checkout`"]
+    ask["`**ask**: Claude Code with your subscription, on the egress-firewall runner; it only reads, in a fix edits a checkout, and translates with no tool at all`"]
     pull["`**pull-request**, a fix only: one signed commit and a pull request, with PAGER_FIX_TOKEN, on another machine`"]
-    answer["`**answer** checks Claude's answer against the allowlist and sends it, signed`"]
-    telegram["`**Telegram**: a draft with ✅ Send, a note, or a proposal with ✅ Confirm`"]
+    answer["`**answer** checks Claude's answer against the allowlist, and a translation against its notes, and sends it, signed`"]
+    telegram["`**Telegram**: a draft with ✅ Send, a note, a proposal with ✅ Confirm, or the notes of a release in your language`"]
 
     you --> worker --> prepare --> ask
     ask -- "a change" --> pull --> answer
