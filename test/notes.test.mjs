@@ -99,9 +99,31 @@ describe("a translated line", () => {
       lost("a plain line", "Zeile, siehe https://evil.example/update"),
       'adds the link "https://evil.example/update"',
     );
-    // A link of its English may stay.
+    // Words that Telegram links by itself count as links too.
+    assert.equal(
+      lost("a plain line", "Zeile, besuche evil.example"),
+      'adds the link "evil.example"',
+    );
+    assert.equal(
+      lost("a plain line", "Zeile, frag @evil_bot"),
+      'adds the link "@evil_bot"',
+    );
+    assert.equal(
+      lost("a plain line", "Zeile, tippe /start"),
+      'adds the link "/start"',
+    );
+    assert.equal(
+      lost("a plain line", "Zeile an a@evil.example"),
+      'adds the link "a@evil.example"',
+    );
+    // German abbreviations are none, and a link of its English may stay.
+    assert.equal(lost("a plain line", "eine Zeile, z.B. bzw. d.h. usw."), "");
     assert.equal(
       lost("see https://a.example/x", "siehe https://a.example/x"),
+      "",
+    );
+    assert.equal(
+      lost("ask @a_bot about check.sh", "frag @a_bot zu check.sh"),
       "",
     );
   });

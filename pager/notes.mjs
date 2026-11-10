@@ -57,9 +57,25 @@ export function spans(text) {
   return text.match(/`[^`]+`/g) ?? [];
 }
 
-/** The links of a line, such as https://example.com/a. */
+/**
+ * The links of a line: a URL such as https://example.com/a, and each word that
+ * Telegram links by itself, without the marks around it: a host such as
+ * example.com/a, a mention such as @a_bot, a command such as /start, and an
+ * address of e-mail. German abbreviations such as z.B. or d.h. are none.
+ */
 export function links(text) {
-  return text.match(/\bhttps?:\/\/[^\s<>"'`]+/gi) ?? [];
+  const urls = text.match(/\bhttps?:\/\/[^\s<>"'`]+/gi) ?? [];
+  const words = text
+    .split(/\s+/)
+    .map((word) =>
+      word.replace(/^["'(«„“`]+/, "").replace(/["'),.:;!?»“”`]+$/, ""),
+    )
+    .filter(
+      (word) =>
+        !word.includes("://") &&
+        /^[@/]\w|\w@\w|\w\.[a-z]{2,}(?:\/|$)/i.test(word),
+    );
+  return [...urls, ...words];
 }
 
 /** A piece of a line for the log, quoted and short. */
