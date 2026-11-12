@@ -1015,3 +1015,30 @@ export function signature(secret, body, seconds) {
     "x-pager-signature": `sha256=${hmac}`,
   };
 }
+
+/**
+ * The statuses below 500 of a request to the pager that pass, and what each means:
+ * Cloudflare answers them in front of the Worker, as a page of HTML, so they get the
+ * tries of a failure of the Worker instead of failing as a refusal of the pager.
+ */
+export const PASSING = {
+  408: "Cloudflare in front of the Worker gave up waiting for the request",
+  429: "the rate limit of Cloudflare in front of the Worker",
+};
+
+/** The longest wait between two tries that a header Retry-After can ask for. */
+export const MAX_RETRY_AFTER = 60_000;
+
+/**
+ * How long to wait before the next try to reach the pager, in milliseconds: the
+ * back-off of the try, or longer when the header Retry-After of the last answer asks
+ * for it, in seconds or as a date, up to MAX_RETRY_AFTER; a longer wait than that
+ * would hold the run up, so the try comes after the back-off as ever.
+ */
+export function pause(headers, backOff, now) {
+  const header = headers?.get("retry-after")?.trim() ?? "";
+  const asked = /^\d+$/.test(header)
+    ? Number(header) * 1000
+    : Date.parse(header) - now;
+  return asked <= MAX_RETRY_AFTER ? Math.max(asked, backOff) : backOff;
+}
