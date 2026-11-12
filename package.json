@@ -11,6 +11,9 @@
   },
   "scripts": {
     "test": "node --test --experimental-test-coverage --test-coverage-include=pager/** --test-coverage-lines=100 --test-coverage-branches=100 --test-coverage-functions=100 test/*.test.mjs",
-    "lint": "npx --yes @biomejs/biome@2.6.4 ci --error-on-warnings ."
+    "lint": "biome ci --error-on-warnings ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.4"
   }
 }
