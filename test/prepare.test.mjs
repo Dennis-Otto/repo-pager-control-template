@@ -1102,7 +1102,7 @@ describe("a job that the owner holds", () => {
     paused: false,
     daily: "",
     repository: CONTROL,
-    run: "77",
+    run: "7700",
     now,
     ...extra,
   });
@@ -1139,12 +1139,15 @@ describe("a job that the owner holds", () => {
     },
   };
   const RUNS = /\/actions\/workflows\/pager\.yml\/runs\?/;
-  /** Today's runs of the workflow on GitHub, by their titles; the first is this run, 77. */
-  const runsOf = (titles) =>
+  /**
+   * Today's runs of the workflow on GitHub, by their titles; the first is this
+   * run, 7700, and the others started before it, or after it from `newer` on.
+   */
+  const runsOf = (titles, newer = titles.length) =>
     new Net().on("GET", RUNS, (call) => {
       const page = Number(new URL(call.url).searchParams.get("page"));
       const runs = titles.map((title, index) => ({
-        id: index === 0 ? 77 : 1000 + index,
+        id: index === 0 ? 7700 : index + (index >= newer ? 7700 : 0),
         display_title: title,
       }));
       return json({
@@ -1241,6 +1244,17 @@ describe("a job that the owner holds", () => {
     const first = runsOf([`pager-translate${BY_ITSELF}`]);
     const zero = await prepareHeld(first, EVENTS.translate, { daily: "0" });
     assert.match(zero.outputs.error, /reached PAGER_DAILY_RUNS, 0;/);
+  });
+
+  it("counts only the runs that started before this one", async () => {
+    // Five drafts start together with PAGER_DAILY_RUNS 3: the newer ones don't hold this one.
+    const titles = Array.from({ length: 5 }, () => `pager-draft${BY_ITSELF}`);
+    const third = runsOf(titles, 3);
+    const runs = await prepareHeld(third, EVENTS.discussion, { daily: "3" });
+    assert.doesNotMatch(runs.outputs.error, /PAGER_DAILY_RUNS/);
+    const fourth = runsOf(titles, 4);
+    const held = await prepareHeld(fourth, EVENTS.discussion, { daily: "3" });
+    assert.match(held.outputs.error, /reached PAGER_DAILY_RUNS, 3;/);
   });
 
   it("reads the next page of runs only while the count stays below PAGER_DAILY_RUNS", async () => {

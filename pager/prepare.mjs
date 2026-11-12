@@ -655,7 +655,11 @@ export function byItself(job) {
   );
 }
 
-/** The runs of today, in UTC, that started by themselves, besides this one, up to limit. */
+/**
+ * The runs of today, in UTC, that started by themselves before this one, up to
+ * limit. A run created after this one doesn't count: when several start within
+ * seconds, the first ones run and only those beyond the limit are held.
+ */
 async function runsOfToday(api, { repository, run, now, limit }) {
   const day = new Date(now()).toISOString().slice(0, 10);
   const created = encodeURIComponent(`>=${day}T00:00:00Z`);
@@ -667,7 +671,7 @@ async function runsOfToday(api, { repository, run, now, limit }) {
     const runs = found?.workflow_runs ?? [];
     count += runs.filter(
       (other) =>
-        String(other.id) !== String(run) &&
+        Number(other.id) < Number(run) &&
         String(other.display_title ?? "").endsWith(BY_ITSELF),
     ).length;
     if (count >= limit || runs.length < PAGE) {
