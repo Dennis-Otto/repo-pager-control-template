@@ -21,7 +21,7 @@ gh repo create "$CONTROL" --private --template Dennis-Otto/repo-pager-control-te
 The new repository has every file of the template, in one commit, and no history of it. Delete its `.github/dependabot.yml`: the template's Dependabot keeps the actions and the tools current and the pull request of the workflow *Template* brings them to you, while bumps of your own would only fight it, since that pull request takes each changed file back to the template's pins. The template lists the file in its `own`, so it never comes back:
 
 ```sh
-gh api -X DELETE "repos/$CONTROL/contents/.github/dependabot.yml"   -f message="chore: the template keeps the actions current"   -f sha="$(gh api "repos/$CONTROL/contents/.github/dependabot.yml" --jq .sha)"
+gh api -X DELETE "repos/$CONTROL/contents/.github/dependabot.yml"   -f message="chore: the template keeps the actions and the tools current"   -f sha="$(gh api "repos/$CONTROL/contents/.github/dependabot.yml" --jq .sha)"
 ```
 
 Then give it its secrets and variables:
