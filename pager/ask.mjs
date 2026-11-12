@@ -16,7 +16,9 @@
 // takes back a question that the agent no longer needs, unless it has an answer.
 // An id is used once: ask refuses one that has an answer already. The exit code is
 // 0 for the answer, 3 while there is none, 1 when gh or a check refuses, and 2 for
-// a wrong command.
+// a wrong command. wait takes a failure of gh that may pass, such as a network
+// error, an error of GitHub's servers or a rate limit, for no answer yet and asks
+// again; one that a retry gets again, such as one of the sign-in, ends it with 1.
 import { ANSWERS, idOf, question, report, withdrawal } from "./agents.mjs";
 import { Refusal } from "./core.mjs";
 
@@ -114,6 +116,34 @@ function dispatch(io, repo, eventType, payload) {
   }
 }
 
+/**
+ * A failure of gh that may pass by itself, such as a network error, an error of
+ * GitHub's servers or a rate limit: wait tries again, a single read refuses.
+ */
+class Passing extends Refusal {
+  constructor(said) {
+    super(`gh couldn't read the answer: ${said}`);
+    this.said = said;
+  }
+}
+
+/**
+ * Whether a failure of gh may pass by itself. One that a retry gets again ends a
+ * wait at once: gh missing (ENOENT) or signed out (its exit code 4), and a refusal
+ * of GitHub, 4xx, such as 401 or 403, other than a rate limit (403 or 429) or a
+ * timeout (408). Anything else, a network error or a 5xx, passes.
+ */
+function passes(read) {
+  if (read.status === 4 || /\bENOENT\b/.test(read.stderr)) {
+    return false;
+  }
+  const code = Number(/\(HTTP (\d{3})\)/.exec(read.stderr)?.[1] ?? 0);
+  if (code < 400 || code >= 500 || code === 408 || code === 429) {
+    return true;
+  }
+  return code === 403 && /rate limit/i.test(read.stderr);
+}
+
 /** The answer to a question, as its file holds it, or null while there is none. */
 function readAnswer(io, repo, id) {
   const read = io.gh([
@@ -129,7 +159,26 @@ function readAnswer(io, repo, id) {
   if (/\b404\b|Not Found/.test(read.stderr)) {
     return null;
   }
-  throw new Refusal(`gh couldn't read the answer: ${read.stderr.trim()}`);
+  const said = read.stderr.trim();
+  if (passes(read)) {
+    throw new Passing(said);
+  }
+  throw new Refusal(`gh couldn't read the answer: ${said}`);
+}
+
+/**
+ * One read of wait: that of answerSince, or, for a failure of gh that may pass,
+ * no answer yet and what gh said.
+ */
+function poll(io, repo, id, time) {
+  try {
+    return { ...answerSince(io, repo, id, time), failed: null };
+  } catch (error) {
+    if (!(error instanceof Passing)) {
+      throw error;
+    }
+    return { answer: null, older: null, failed: error.said };
+  }
 }
 
 /**
@@ -238,8 +287,13 @@ const commands = {
     const every = seconds(found.every, WAIT.every, "every");
     const until = io.now() + timeout * 1000;
     let told = false;
+    // A failure of gh that passes is no answer yet; it is said once.
+    let warned = false;
+    // Whether a read came through, and what gh said the last time one didn't.
+    let read = false;
+    let last = "";
     for (;;) {
-      const { answer, older } = answerSince(io, repo, id, time);
+      const { answer, older, failed } = poll(io, repo, id, time);
       if (answer !== null) {
         io.out(answer);
         return 0;
@@ -250,8 +304,23 @@ const commands = {
         );
         told = true;
       }
+      if (failed === null) {
+        read = true;
+      } else {
+        last = failed;
+        if (!warned) {
+          io.err(
+            `Couldn't read the answer to ${id} this time: ${failed}. Trying again every ${every} s.`,
+          );
+          warned = true;
+        }
+      }
       if (io.now() + every * 1000 > until) {
-        io.err(`No answer to ${id} within ${timeout} s.`);
+        io.err(
+          read
+            ? `No answer to ${id} within ${timeout} s.`
+            : `No answer to ${id} within ${timeout} s, and no read of it came through; the last failed with: ${last}.`,
+        );
         return 3;
       }
       await io.sleep(every * 1000);

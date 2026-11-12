@@ -201,6 +201,34 @@ function machine(answers = [], env = {}) {
 const NONE = { status: 1, stdout: "", stderr: "gh: Not Found (HTTP 404)\n" };
 const ANSWER = { status: 0, stdout: '{"answer":"The pager"}\n', stderr: "" };
 
+/** A failure of gh as it says it on its standard error, with its exit code. */
+function failure(stderr, status = 1) {
+  return { status, stdout: "", stderr: `${stderr}\n` };
+}
+
+// Failures that pass: of the network, of GitHub's servers, of a rate limit.
+const OFFLINE = failure("error connecting to api.github.com");
+const BAD_GATEWAY = failure("gh: Bad Gateway (HTTP 502)");
+const TOO_MANY = failure("gh: Too Many Requests (HTTP 429)");
+const TIMED_OUT = failure("gh: Request Timeout (HTTP 408)");
+const RATE_LIMITED = failure(
+  "gh: You have exceeded a secondary rate limit. Please wait a few minutes before you try again. (HTTP 403)",
+);
+
+// Failures that a retry gets again: of the sign-in, of the rights, of gh itself.
+const BAD_CREDENTIALS = failure("gh: Bad credentials (HTTP 401)");
+const FORBIDDEN = failure(
+  "gh: Resource not accessible by integration (HTTP 403)",
+);
+const SIGNED_OUT = failure(
+  "To get started with GitHub CLI, please run:  gh auth login",
+  4,
+);
+const NO_GH = failure("spawnSync gh ENOENT");
+const UNPROCESSABLE = failure(
+  "gh: No commit found for the ref pager-answers (HTTP 422)",
+);
+
 /** The time of a question, as ask prints it. */
 const ASKED_AT = "2026-11-08T07:00:00.000Z";
 
@@ -358,6 +386,80 @@ describe("the command line of an agent", () => {
     const fallback = machine([ANSWER]);
     assert.equal(await run(["wait", "merge-order"], fallback.io), 0);
     assert.deepEqual(WAIT, { timeout: 3600, every: 30 });
+  });
+
+  it("keeps waiting through a failure of gh that passes, and says so once", async () => {
+    const m = machine([
+      NONE,
+      BAD_GATEWAY,
+      RATE_LIMITED,
+      TIMED_OUT,
+      NONE,
+      ANSWER,
+    ]);
+    assert.equal(await run(["wait", "merge-order", "--every", "5"], m.io), 0);
+    assert.deepEqual(m.slept, [5000, 5000, 5000, 5000, 5000]);
+    assert.deepEqual(m.out, ['{"answer":"The pager"}']);
+    assert.deepEqual(m.err, [
+      "Couldn't read the answer to merge-order this time: gh: Bad Gateway (HTTP 502). Trying again every 5 s.",
+    ]);
+  });
+
+  it("gives up after its time with 3, and names the last failure when no read came through", async () => {
+    const failing = machine([OFFLINE, BAD_GATEWAY, TOO_MANY]);
+    assert.equal(
+      await run(
+        ["wait", "merge-order", "--timeout", "60", "--every", "30"],
+        failing.io,
+      ),
+      3,
+    );
+    assert.deepEqual(failing.slept, [30000, 30000]);
+    assert.deepEqual(failing.err, [
+      "Couldn't read the answer to merge-order this time: error connecting to api.github.com. Trying again every 30 s.",
+      "No answer to merge-order within 60 s, and no read of it came through; the last failed with: gh: Too Many Requests (HTTP 429).",
+    ]);
+    const once = machine([BAD_GATEWAY, NONE]);
+    assert.equal(
+      await run(
+        ["wait", "merge-order", "--timeout", "30", "--every", "30"],
+        once.io,
+      ),
+      3,
+    );
+    assert.equal(once.err.at(-1), "No answer to merge-order within 30 s.");
+  });
+
+  it("stops waiting at a failure that a retry would get again, such as one of the sign-in", async () => {
+    for (const [failed, message] of [
+      [BAD_CREDENTIALS, "gh: Bad credentials (HTTP 401)"],
+      [FORBIDDEN, "gh: Resource not accessible by integration (HTTP 403)"],
+      [
+        SIGNED_OUT,
+        "To get started with GitHub CLI, please run:  gh auth login",
+      ],
+      [NO_GH, "spawnSync gh ENOENT"],
+      [
+        UNPROCESSABLE,
+        "gh: No commit found for the ref pager-answers (HTTP 422)",
+      ],
+    ]) {
+      const m = machine([NONE, failed, ANSWER]);
+      assert.equal(await run(["wait", "merge-order", "--every", "5"], m.io), 1);
+      assert.equal(m.calls.length, 2);
+      assert.deepEqual(m.out, []);
+      assert.deepEqual(m.err, [
+        `Refused: gh couldn't read the answer: ${message}.`,
+      ]);
+    }
+  });
+
+  it("refuses a single read that fails, even one that would pass", async () => {
+    const m = machine([BAD_GATEWAY]);
+    assert.equal(await run(["answer", "merge-order"], m.io), 1);
+    assert.deepEqual(m.err, [
+      "Refused: gh couldn't read the answer: gh: Bad Gateway (HTTP 502).",
+    ]);
   });
 
   it("waits for an answer newer than the question with --since, and says once that it ignores an older one", async () => {
