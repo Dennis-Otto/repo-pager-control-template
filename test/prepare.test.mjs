@@ -8,9 +8,12 @@ import { describe, it } from "node:test";
 
 import { GitHub, GitHubError } from "../pager/github.mjs";
 import {
+  BY_ITSELF,
+  byItself,
   excerpt,
   failures,
   healthRun,
+  held,
   prepare,
   READ,
   snapshot,
@@ -1087,6 +1090,254 @@ describe("the part of a log that Claude reads", () => {
     assert.equal(
       excerpt(`${"x".repeat(READ.line + 5)}\ndomain resolved: github.com.`),
       `${"x".repeat(READ.line)}…`,
+    );
+  });
+});
+
+describe("a job that the owner holds", () => {
+  const CONTROL = "monalisa/repo-pager-control";
+  // 2026-11-12 at 18:00 UTC.
+  const now = () => Date.UTC(2026, 10, 12, 18);
+  const hold = (extra) => ({
+    paused: false,
+    daily: "",
+    repository: CONTROL,
+    run: "7700",
+    now,
+    ...extra,
+  });
+  const payload = { item: ITEM, repo: REPO, number: 31 };
+  const EVENTS = {
+    text: { action: "pager-text", client_payload: { text: "Hi", message: 3 } },
+    draft: {
+      action: "pager-draft",
+      client_payload: { ...payload, pull: false },
+    },
+    discussion: {
+      action: "pager-draft",
+      client_payload: { ...payload, pull: false, discussion: true },
+    },
+    fix: {
+      action: "pager-fix",
+      client_payload: {
+        item: ITEM,
+        repo: REPO,
+        kind: "alarm",
+        entries: [
+          { label: "A bot fails", url: `https://github.com/${REPO}/issues/9` },
+        ],
+      },
+    },
+    translate: {
+      action: "pager-translate",
+      client_payload: {
+        ...payload,
+        of: "0a1b2c3d",
+        lines: ["the pager speaks German"],
+        language: "de",
+      },
+    },
+  };
+  const RUNS = /\/actions\/workflows\/pager\.yml\/runs\?/;
+  /**
+   * Today's runs of the workflow on GitHub, by their titles; the first is this
+   * run, 7700, and the others started before it, or after it from `newer` on.
+   */
+  const runsOf = (titles, newer = titles.length) =>
+    new Net().on("GET", RUNS, (call) => {
+      const page = Number(new URL(call.url).searchParams.get("page"));
+      const runs = titles.map((title, index) => ({
+        id: index === 0 ? 7700 : index + (index >= newer ? 7700 : 0),
+        display_title: title,
+      }));
+      return json({
+        total_count: runs.length,
+        workflow_runs: runs.slice((page - 1) * 100, page * 100),
+      });
+    });
+  async function prepareHeld(net, event, extra) {
+    const out = await mkdtemp(join(tmpdir(), "pager-"));
+    const result = await prepare({
+      eventName: "repository_dispatch",
+      event,
+      owner: OWNER,
+      api: api(net),
+      out,
+      read,
+      hold: hold(extra),
+    });
+    const names = (await readdir(out, { recursive: true })).sort();
+    return { ...result, names };
+  }
+
+  it("counts a translation and the draft of a discussion as jobs that start by themselves", () => {
+    assert.equal(byItself({ kind: "translate" }), true);
+    assert.equal(byItself({ kind: "draft", discussion: true }), true);
+    assert.equal(byItself({ kind: "draft", pull: false }), false);
+    assert.equal(byItself({ kind: "draft", pull: true }), false);
+    assert.equal(byItself({ kind: "fix" }), false);
+    assert.equal(byItself({ kind: "text" }), false);
+  });
+
+  it("holds every kind of job with PAGER_PAUSED, collects nothing and says why", async () => {
+    for (const event of Object.values(EVENTS)) {
+      const net = new Net();
+      const { outputs, names } = await prepareHeld(net, event, {
+        paused: true,
+        daily: "5",
+      });
+      assert.equal(
+        outputs.error,
+        "the jobs of the pager are paused by PAGER_PAUSED; delete the variable to start them again",
+      );
+      assert.equal(net.calls.length, 0, event.action);
+      assert.deepEqual(names, ["logs", "rules.md", "task.md"]);
+    }
+  });
+
+  it("runs a job that starts by itself while today's runs are below PAGER_DAILY_RUNS", async () => {
+    const net = runsOf([
+      `pager-draft${BY_ITSELF}`,
+      `pager-translate${BY_ITSELF}`,
+      "pager-draft",
+      "pager-text",
+    ]);
+    // This run and the presses don't count: one of two.
+    const { outputs, names } = await prepareHeld(net, EVENTS.translate, {
+      daily: "2",
+    });
+    assert.equal(outputs.error, "");
+    assert.equal(outputs.model, "claude-sonnet-5-5");
+    assert.deepEqual(names, ["logs", "rules.md", "task.md"]);
+    assert.equal(net.calls.length, 1);
+    const url = new URL(net.calls[0].url);
+    assert.equal(
+      url.pathname,
+      `/repos/${CONTROL}/actions/workflows/pager.yml/runs`,
+    );
+    assert.equal(url.searchParams.get("event"), "repository_dispatch");
+    assert.equal(url.searchParams.get("created"), ">=2026-11-12T00:00:00Z");
+    assert.equal(url.searchParams.get("per_page"), "100");
+    assert.equal(url.searchParams.get("page"), "1");
+    // The draft of a discussion below the limit reads its thread.
+    const thread = runsOf(["pager-draft (by itself)"]);
+    const draft = await prepareHeld(thread, EVENTS.discussion, { daily: "1" });
+    assert.match(draft.outputs.error, /the thread didn't come from GitHub/);
+    assert.equal(thread.calls.at(-1).url, "https://api.github.com/graphql");
+  });
+
+  it("holds a job that starts by itself once today's runs reach PAGER_DAILY_RUNS", async () => {
+    for (const event of [EVENTS.discussion, EVENTS.translate]) {
+      const net = runsOf([
+        `pager-translate${BY_ITSELF}`,
+        `pager-draft${BY_ITSELF}`,
+        `pager-translate${BY_ITSELF}`,
+      ]);
+      const { outputs, names } = await prepareHeld(net, event, { daily: "2" });
+      assert.equal(
+        outputs.error,
+        "today's runs that start by themselves, drafts of discussions and translations, reached PAGER_DAILY_RUNS, 2; the count starts again at 00:00 UTC",
+      );
+      assert.equal(net.calls.length, 1);
+      assert.deepEqual(names, ["logs", "rules.md", "task.md"]);
+    }
+    const first = runsOf([`pager-translate${BY_ITSELF}`]);
+    const zero = await prepareHeld(first, EVENTS.translate, { daily: "0" });
+    assert.match(zero.outputs.error, /reached PAGER_DAILY_RUNS, 0;/);
+  });
+
+  it("counts only the runs that started before this one", async () => {
+    // Five drafts start together with PAGER_DAILY_RUNS 3: the newer ones don't hold this one.
+    const titles = Array.from({ length: 5 }, () => `pager-draft${BY_ITSELF}`);
+    const third = runsOf(titles, 3);
+    const runs = await prepareHeld(third, EVENTS.discussion, { daily: "3" });
+    assert.doesNotMatch(runs.outputs.error, /PAGER_DAILY_RUNS/);
+    const fourth = runsOf(titles, 4);
+    const held = await prepareHeld(fourth, EVENTS.discussion, { daily: "3" });
+    assert.match(held.outputs.error, /reached PAGER_DAILY_RUNS, 3;/);
+  });
+
+  it("reads the next page of runs only while the count stays below PAGER_DAILY_RUNS", async () => {
+    const titles = [
+      `pager-translate${BY_ITSELF}`,
+      ...Array.from({ length: 150 }, (_, index) =>
+        index % 2 === 0 ? `pager-draft${BY_ITSELF}` : "pager-draft",
+      ),
+    ];
+    const reached = runsOf(titles);
+    const full = await prepareHeld(reached, EVENTS.translate, { daily: "75" });
+    assert.match(full.outputs.error, /reached PAGER_DAILY_RUNS, 75;/);
+    assert.equal(reached.calls.length, 2);
+    const below = runsOf(titles);
+    const next = await prepareHeld(below, EVENTS.translate, { daily: "76" });
+    assert.equal(next.outputs.error, "");
+    assert.equal(below.calls.length, 2);
+    const early = runsOf(titles);
+    await prepareHeld(early, EVENTS.translate, { daily: "10" });
+    assert.equal(early.calls.length, 1);
+  });
+
+  it("never counts a press of the owner, nor without PAGER_DAILY_RUNS", async () => {
+    const net = new Net();
+    for (const job of [
+      { kind: "draft", pull: false },
+      { kind: "draft", pull: true },
+      { kind: "fix" },
+      { kind: "text" },
+    ]) {
+      assert.equal(await held(job, api(net), hold({ daily: "0" })), "");
+    }
+    assert.equal(
+      await held({ kind: "translate" }, api(net), hold({ daily: "" })),
+      "",
+    );
+    assert.equal(net.calls.length, 0);
+    const text = await prepareHeld(
+      new Net().on("POST", "/graphql", () => json({ data: {} })),
+      EVENTS.text,
+      { daily: "0" },
+    );
+    assert.equal(text.outputs.error, "");
+  });
+
+  it("holds a job that starts by itself when PAGER_DAILY_RUNS isn't a whole number", async () => {
+    for (const daily of ["ten", "-1", "1.5", "x".repeat(60)]) {
+      const net = new Net();
+      assert.equal(
+        await held({ kind: "translate" }, api(net), hold({ daily })),
+        `PAGER_DAILY_RUNS isn't a whole number from 0 but ${daily.slice(0, 40)}, so no job that starts by itself runs`,
+      );
+      assert.equal(net.calls.length, 0);
+    }
+  });
+
+  it("holds a job that starts by itself when GitHub doesn't give today's runs", async () => {
+    const refused = new Net().on("GET", RUNS, () =>
+      json({ message: "Resource not accessible by integration" }, 403),
+    );
+    assert.equal(
+      await held({ kind: "translate" }, api(refused), hold({ daily: "3" })),
+      "today's runs of the pager didn't come from GitHub, so PAGER_DAILY_RUNS can't be kept: GitHub answered 403: Resource not accessible by integration",
+    );
+    // An answer without runs, or a run without a title, counts none.
+    const empty = new Net().on("GET", RUNS, () => json({}));
+    assert.equal(
+      await held({ kind: "translate" }, api(empty), hold({ daily: "3" })),
+      "",
+    );
+    const untitled = new Net().on("GET", RUNS, () =>
+      json({ workflow_runs: [{ id: 5 }] }),
+    );
+    assert.equal(
+      await held({ kind: "translate" }, api(untitled), hold({ daily: "1" })),
+      "",
+    );
+    const broken = new Net().on("GET", RUNS, () => {
+      throw new TypeError("a bug");
+    });
+    await assert.rejects(
+      held({ kind: "translate" }, api(broken), hold({ daily: "3" })),
+      TypeError,
     );
   });
 });

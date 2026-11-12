@@ -128,9 +128,18 @@ const commands = {
       out: env.PAGER_INPUT,
       read: (name) => readFile(join(HERE, name), "utf8"),
       workflows: workflowsAllowed(env.PAGER_FIX_WORKFLOWS),
+      hold: {
+        paused: (env.PAGER_PAUSED ?? "").trim() !== "",
+        daily: (env.PAGER_DAILY_RUNS ?? "").trim(),
+        repository: env.GITHUB_REPOSITORY,
+        run: env.GITHUB_RUN_ID,
+        now: Date.now,
+      },
     });
     await writeOutputs(env.GITHUB_OUTPUT, outputs);
-    return `A job of the kind ${outputs.kind}.`;
+    return outputs.error === ""
+      ? `A job of the kind ${outputs.kind}.`
+      : `A job of the kind ${outputs.kind}, which Claude doesn't run: ${outputs.error}.`;
   },
 
   access(env, io) {

@@ -15,6 +15,10 @@ name: Pager
 #
 # Each job runs on its own machine, and the secrets that write never meet Claude.
 # A job of the Actions tab, by hand, is a free text, to try the pager.
+#
+# PAGER_PAUSED holds every job, and PAGER_DAILY_RUNS the jobs that start without a
+# press of the owner, once today's are spent: prepare then sends no job to Claude,
+# and answer tells the pager why, which brings the button of a thing back at once.
 
 on:
   repository_dispatch:
@@ -31,6 +35,11 @@ on:
         options: [en, de]
         default: en
 
+# The title of a run is its event, and " (by itself)" after it for a job that
+# starts without a press of the owner, as byItself of pager/prepare.mjs says: a
+# translation, or the draft of a discussion. PAGER_DAILY_RUNS counts these titles.
+run-name: ${{ github.event.action || 'Pager' }}${{ (github.event.action == 'pager-translate' || (github.event.action == 'pager-draft' && github.event.client_payload.discussion == true)) && ' (by itself)' || '' }}
+
 permissions: {}
 
 # One job of a thing at a time; each free text runs on its own.
@@ -45,6 +54,8 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+      # The runs of this workflow today, which PAGER_DAILY_RUNS counts.
+      actions: read
     outputs:
       job: ${{ steps.prepare.outputs.job }}
       kind: ${{ steps.prepare.outputs.kind }}
@@ -73,6 +84,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PAGER_INPUT: pager-input
           PAGER_FIX_WORKFLOWS: ${{ vars.PAGER_FIX_WORKFLOWS }}
+          PAGER_PAUSED: ${{ vars.PAGER_PAUSED }}
+          PAGER_DAILY_RUNS: ${{ vars.PAGER_DAILY_RUNS }}
         run: node pager/job.mjs prepare
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

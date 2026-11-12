@@ -1,14 +1,17 @@
 // The promises of the README about the workflows, which the settings of the template
 // enforce on GitHub as well: only GitHub's own actions and anthropics/claude-code-action
 // run, each pinned to a commit (the Actions policy of selected actions with required SHA
-// pinning), every job gets contents: read at most, and the two exceptions: the workflow
-// Dependabot merges only a pull request of Dependabot, in the template alone, and the
-// workflow Health keeps one issue of a failed check.
+// pinning), every job gets contents: read at most, and the three exceptions: the
+// workflow Dependabot merges only a pull request of Dependabot, in the template alone,
+// the workflow Health keeps one issue of a failed check, and the job prepare of the
+// workflow Pager reads today's runs of its own workflow for PAGER_DAILY_RUNS.
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
+
+import { BY_ITSELF } from "../pager/prepare.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const WORKFLOWS = ".github/workflows";
@@ -18,6 +21,9 @@ const MERGE_PERMISSIONS = ["contents: write", "pull-requests: write"];
 // The workflow whose jobs keep the issue of a failed check, and what they may write.
 const HEALTH = "health.yml";
 const HEALTH_PERMISSIONS = ["contents: read", "issues: write"];
+// The workflow whose job prepare counts its runs of today, and what it may read.
+const PAGER = "pager.yml";
+const PAGER_PERMISSIONS = ["contents: read", "actions: read"];
 // The actions that the Actions policy of the template allows besides GitHub's own.
 const ALLOWED = ["anthropics/claude-code-action"];
 
@@ -76,6 +82,7 @@ describe("the workflows of the template", {
       const allowed = {
         [MERGE]: MERGE_PERMISSIONS,
         [HEALTH]: HEALTH_PERMISSIONS,
+        [PAGER]: PAGER_PERMISSIONS,
       }[name] ?? ["contents: read"];
       assert.deepEqual(
         granted.filter((line) => !allowed.includes(line)),
@@ -149,5 +156,37 @@ describe("the workflow Health", () => {
     );
     assert.match(secrets, /PAGER_CONTROL_SECRET/);
     assert.doesNotMatch(secrets, /GH_TOKEN|github\.token|if:/);
+  });
+});
+
+describe("the workflow Pager", () => {
+  const text = read(`${WORKFLOWS}/${PAGER}`);
+  const prepare = text.slice(
+    text.indexOf("  prepare:"),
+    text.indexOf("  ask:"),
+  );
+
+  it("gives actions: read to the job prepare alone, which counts the runs", () => {
+    assert.equal(text.match(/^\s+actions: read$/gm).length, 1);
+    assert.match(prepare, /^ {6}actions: read$/m);
+  });
+
+  it("titles a run that starts by itself as byItself of pager/prepare.mjs says", () => {
+    // Change both together: PAGER_DAILY_RUNS counts the runs by this title.
+    assert.equal(
+      text.match(/^run-name: (.*)$/m)[1],
+      `\${{ github.event.action || 'Pager' }}\${{ (github.event.action == 'pager-translate' || (github.event.action == 'pager-draft' && github.event.client_payload.discussion == true)) && '${BY_ITSELF}' || '' }}`,
+    );
+  });
+
+  it("hands PAGER_PAUSED and PAGER_DAILY_RUNS to the job prepare", () => {
+    assert.match(
+      prepare,
+      /^ {10}PAGER_PAUSED: \$\{\{ vars\.PAGER_PAUSED \}\}$/m,
+    );
+    assert.match(
+      prepare,
+      /^ {10}PAGER_DAILY_RUNS: \$\{\{ vars\.PAGER_DAILY_RUNS \}\}$/m,
+    );
   });
 });
