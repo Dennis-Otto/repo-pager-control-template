@@ -15,6 +15,12 @@ export const SETTINGS = ".github/template.json";
 /** The branch of the pull request that brings the template's changes. */
 export const BRANCH = "template-sync";
 
+/**
+ * The branch on which the commit of a change comes to be, for the moments before
+ * BRANCH moves to it, and which goes again right after.
+ */
+export const WORK = `${BRANCH}-next`;
+
 /** The mark in the description that names what the pull request takes. */
 const MARK = /<!-- template ([0-9a-f]{40}) onto ([0-9a-f]{40}) -->/;
 
@@ -159,6 +165,24 @@ async function tipOf(api, repo) {
   return { branch, sha: ref.object.sha };
 }
 
+/** Point a branch at a commit: make it, or move the one that is there. */
+async function point(api, repo, branch, sha) {
+  try {
+    await api.post(`/repos/${repo}/git/refs`, {
+      ref: `refs/heads/${branch}`,
+      sha,
+    });
+  } catch (error) {
+    if (error?.status !== 422) {
+      throw error;
+    }
+    await api.json("PATCH", `/repos/${repo}/git/refs/heads/${branch}`, {
+      sha,
+      force: true,
+    });
+  }
+}
+
 /** The files of a repository at a commit. */
 async function treeOf(api, repo, sha) {
   return filesOf(await api.get(`/repos/${repo}/git/trees/${sha}?recursive=1`));
@@ -272,33 +296,32 @@ export async function takeTemplate({ api, repo, write }) {
     path: SETTINGS,
     contents: Buffer.from(settled).toString("base64"),
   });
-  try {
-    await api.post(`/repos/${repo}/git/refs`, {
-      ref: `refs/heads/${BRANCH}`,
-      sha: here.sha,
-    });
-  } catch (error) {
-    if (error?.status !== 422) {
-      throw error;
-    }
-    // The branch of an earlier change: it starts again from the default branch.
-    await api.json("PATCH", `/repos/${repo}/git/refs/heads/${BRANCH}`, {
-      sha: here.sha,
-      force: true,
-    });
-  }
+  // The commit comes to be on a branch of its own, on the default branch, and the
+  // branch of the pull request moves to it in one step. Moved back to the default
+  // branch first, even for a moment, the head of an open pull request would have
+  // no commit of its own, and GitHub would close the pull request for good.
   const title = `chore: take the template up to ${short(source.sha)}`;
-  await api.graphql(COMMIT, {
-    input: {
-      branch: { repositoryNameWithOwner: repo, branchName: BRANCH },
-      expectedHeadOid: here.sha,
-      message: { headline: title, body: `From ${template}.` },
-      fileChanges: {
-        additions,
-        deletions: changes.remove.map((path) => ({ path })),
+  await point(api, repo, WORK, here.sha);
+  try {
+    const made = await api.graphql(COMMIT, {
+      input: {
+        branch: { repositoryNameWithOwner: repo, branchName: WORK },
+        expectedHeadOid: here.sha,
+        message: { headline: title, body: `From ${template}.` },
+        fileChanges: {
+          additions,
+          deletions: changes.remove.map((path) => ({ path })),
+        },
       },
-    },
-  });
+    });
+    await point(api, repo, BRANCH, made.createCommitOnBranch.commit.oid);
+  } finally {
+    // A branch left over, should GitHub refuse to delete it, starts the next run
+    // again from the default branch, so it fails no run.
+    await api
+      .request("DELETE", `/repos/${repo}/git/refs/heads/${WORK}`)
+      .catch(() => null);
+  }
   const body = pullBody({
     template,
     commit,
@@ -307,11 +330,23 @@ export async function takeTemplate({ api, repo, write }) {
     changes,
   });
   if (open !== undefined) {
-    await api.json("PATCH", `/repos/${repo}/pulls/${open.number}`, {
-      title,
-      body,
-    });
-    return { state: "updated", url: open.html_url, ...found };
+    // Open again, should someone have closed it since: a pull request that GitHub
+    // won't open again, merged meanwhile, gives way to a new one.
+    const again = await api
+      .json("PATCH", `/repos/${repo}/pulls/${open.number}`, {
+        title,
+        body,
+        state: "open",
+      })
+      .catch((error) => {
+        if (error?.status !== 422) {
+          throw error;
+        }
+        return null;
+      });
+    if (again?.state === "open") {
+      return { state: "updated", url: again.html_url, ...found };
+    }
   }
   const pull = await api.post(`/repos/${repo}/pulls`, {
     title,
