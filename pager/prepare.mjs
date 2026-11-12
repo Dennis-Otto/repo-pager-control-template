@@ -638,7 +638,15 @@ export async function failures(api, job) {
  * Prepare a job: check its event, collect its data into out and return the job and
  * the outputs of the step, which name the limits and the schema of its kind.
  */
-export async function prepare({ eventName, event, owner, api, out, read }) {
+export async function prepare({
+  eventName,
+  event,
+  owner,
+  api,
+  out,
+  read,
+  workflows = false,
+}) {
   const job = readJob(eventName, event, owner);
   const files = {};
   let error = "";
@@ -683,7 +691,7 @@ export async function prepare({ eventName, event, owner, api, out, read }) {
   // lines that no note can hold, and is its prompt; data/task.md keeps it for the
   // maintainer, who may look at what Claude got.
   const data = `notes-${randomBytes(8).toString("hex")}`;
-  files["task.md"] = task(job, Object.keys(files).sort(), data);
+  files["task.md"] = task(job, Object.keys(files).sort(), data, workflows);
   files["rules.md"] = await read("rules.md");
   await mkdir(join(out, "logs"), { recursive: true });
   for (const [name, content] of Object.entries(files)) {

@@ -32,7 +32,7 @@ import { deliver } from "./deliver.mjs";
 import { GitHub } from "./github.mjs";
 import { check } from "./health.mjs";
 import { prepare } from "./prepare.mjs";
-import { openPull } from "./pull.mjs";
+import { openPull, workflowsAllowed } from "./pull.mjs";
 import { reportOf, short, summaryOf, takeTemplate } from "./template.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -98,6 +98,7 @@ const commands = {
       api: new GitHub(env.GH_TOKEN, io.fetch),
       out: env.PAGER_INPUT,
       read: (name) => readFile(join(HERE, name), "utf8"),
+      workflows: workflowsAllowed(env.PAGER_FIX_WORKFLOWS),
     });
     await writeOutputs(env.GITHUB_OUTPUT, outputs);
     return `A job of the kind ${outputs.kind}.`;
@@ -116,6 +117,7 @@ const commands = {
       api: new GitHub(env.PAGER_FIX_TOKEN, io.fetch),
       git: io.git,
       read: (path) => readFile(join(env.PAGER_REPO, path)),
+      workflows: workflowsAllowed(env.PAGER_FIX_WORKFLOWS),
     });
     await writeOutputs(env.GITHUB_OUTPUT, result);
     return result.url === "" ? `No pull request: ${result.error}.` : result.url;

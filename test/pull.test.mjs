@@ -10,6 +10,8 @@ import {
   LIMIT,
   openPull,
   pullBody,
+  runsInCi,
+  workflowsAllowed,
 } from "../pager/pull.mjs";
 import { ITEM, json, Net, REPO } from "./fake.mjs";
 
@@ -171,6 +173,82 @@ describe("the pull request of a fix", () => {
     large.files["a.txt"] = Buffer.alloc(LIMIT.bytes + 1);
     assert.equal((await large.open()).error, "the change is larger than 5 MB");
     assert.equal(large.net.calls.length, 0);
+  });
+
+  it("refuses a change of what the CI runs, as long as PAGER_FIX_WORKFLOWS doesn't allow it", async () => {
+    // The checks of the pull request run its workflows with the secrets of the
+    // target repository before anyone has read it.
+    const workflow = world({
+      changes: raw(
+        ["M", "100644", "a.txt"],
+        ["M", "100644", ".github/workflows/ci.yml"],
+      ),
+    });
+    assert.deepEqual(await workflow.open(), {
+      url: "",
+      error:
+        "the change touches what the CI runs, which a fix doesn't change unless PAGER_FIX_WORKFLOWS allows it: .github/workflows/ci.yml",
+    });
+    assert.equal(workflow.net.calls.length, 0);
+    const many = world({
+      changes: raw(
+        ["A", "100644", ".github/actions/setup/action.yml"],
+        ["D", "000000", ".github/workflows/old.yml"],
+        ["M", "100644", "tools/lint/action.yaml"],
+      ),
+    });
+    assert.match(
+      (await many.open()).error,
+      /: \.github\/actions\/setup\/action\.yml and 2 more$/,
+    );
+    const allowed = world({
+      changes: raw(["M", "100644", ".github/workflows/ci.yml"]),
+    });
+    allowed.files[".github/workflows/ci.yml"] = Buffer.from("on: push");
+    assert.deepEqual(await allowed.open({ workflows: true }), {
+      url: `https://github.com/${REPO}/pull/40`,
+      error: "",
+    });
+    assert.deepEqual(
+      allowed.net.to("/graphql")[0].body.variables.input.fileChanges.additions,
+      [
+        {
+          path: ".github/workflows/ci.yml",
+          contents: Buffer.from("on: push").toString("base64"),
+        },
+      ],
+    );
+  });
+
+  it("knows the paths that the CI runs, and the value that allows them", () => {
+    for (const path of [
+      ".github/workflows/ci.yml",
+      ".github/workflows/nested/x.yaml",
+      ".GitHub/Workflows/CI.yml",
+      ".github/actions/setup/action.yml",
+      ".github/actions/run.sh",
+      "action.yml",
+      "action.yaml",
+      "tools/lint/action.yml",
+    ]) {
+      assert.equal(runsInCi(path), true, path);
+    }
+    for (const path of [
+      "README.md",
+      ".github/dependabot.yml",
+      ".github/workflows.md",
+      "docs/workflows/ci.md",
+      "src/action.yml.md",
+      "my-action.yml",
+    ]) {
+      assert.equal(runsInCi(path), false, path);
+    }
+    assert.equal(workflowsAllowed("true"), true);
+    assert.equal(workflowsAllowed(" True\n"), true);
+    assert.equal(workflowsAllowed("false"), false);
+    assert.equal(workflowsAllowed("yes"), false);
+    assert.equal(workflowsAllowed(""), false);
+    assert.equal(workflowsAllowed(undefined), false);
   });
 
   it("takes its branch back when GitHub refuses the commit or the pull request", async () => {
