@@ -1,0 +1,39 @@
+name: Dependabot
+
+# A pull request of Dependabot merges by itself once it is green: this job turns on
+# auto-merge with a squash, and the ruleset of main holds the merge until the required
+# check Tests, lint and workflows passes, so a new pin reaches the control repositories
+# without waiting for the maintainer. It runs in the template alone: a control
+# repository takes its pins through the pull request of the workflow Template and
+# deletes its dependabot.yml, as the README says, and a private copy on GitHub Free has
+# no ruleset that would hold the merge for its tests. Its job is the one with write
+# permissions, for the pull request that Dependabot opened and nothing else; when the
+# setting Allow auto-merge is off, it warns and the pull request waits for a person.
+
+on:
+  pull_request:
+    types: [opened, reopened]
+
+permissions: {}
+
+jobs:
+  merge:
+    name: Merge when green
+    if: ${{ github.event.pull_request.user.login == 'dependabot[bot]' && github.event.repository.is_template }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Turn on auto-merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PULL_REQUEST: ${{ github.event.pull_request.html_url }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          if [ "$(gh api "repos/$REPOSITORY" --jq .allow_auto_merge)" != true ]; then
+            echo "::warning::Allow auto-merge is off in the settings of $REPOSITORY, so this pull request waits for a person. Turn it on as the README says under Development."
+            exit 0
+          fi
+          gh pr merge --auto --squash "$PULL_REQUEST"
