@@ -607,9 +607,10 @@ function translation(job, data) {
 /**
  * The task of a job, which Claude reads first, as the prompt points it there; a
  * translation gets it as its prompt, with its notes between the lines that data
- * names.
+ * names. `workflows` says whether a fix may change what the CI runs, as
+ * PAGER_FIX_WORKFLOWS allows it.
  */
-export function task(job, files, data = "") {
+export function task(job, files, data = "", workflows = false) {
   if (job.kind === "translate") {
     return translation(job, data);
   }
@@ -684,6 +685,9 @@ export function task(job, files, data = "") {
     "- **A newer attempt runs or passed:** the failure is already being retried, or it passed on retry. Change nothing and say so.",
     "- **An outage of GitHub or of a download,** such as an HTTP status of 5xx (a 502, a 503 or a 504), a timeout, or a connection that failed, such as `error connecting to api.github.com`, where the commit didn't cause it: change nothing, name the error, and set `rerun` to true. The pager then offers its 🔁 Rerun button with your answer, which runs the failed jobs again.",
     "- **A cause in the repository:** fix it with the smallest change in `repo/` that a reviewer would accept: follow the AGENTS.md, CONTRIBUTING.md and the style of the repository, and add or change a test where the change is code. A file that the repository's `.copier-answers.yml` brings from its template, which `_src_path` there names, and that the `copier.yml` of that template doesn't skip, is fixed in the template, not here: then change nothing and say so.",
+    workflows
+      ? "- **A workflow or an action of the CI,** a file under `.github/workflows/` or `.github/actions/` or an `action.yml`: the maintainer allows a fix to change one. The checks of the pull request run it with the secrets of the repository before the maintainer has read it, so change one only where the cause is, and say so in the description."
+      : "- **A workflow or an action of the CI,** a file under `.github/workflows/` or `.github/actions/` or an `action.yml`, isn't part of a fix: the checks of the pull request would run it with the secrets of the repository before the maintainer has read it, and the pull request is refused. If the cause is there, change nothing, and say in `answer` which change of which file would fix it.",
     "",
     "Never guess. If no log shows the cause, change nothing, and say which log is missing and why, as `unread` says. Your answer names the error that you found, in a few words. Set `rerun` only for an outage, never for a failure that is already being retried or that passed on retry, nor for one whose cause you don't know.",
     "",

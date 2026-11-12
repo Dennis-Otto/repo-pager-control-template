@@ -4,6 +4,10 @@
 // that Claude saw, and becomes one commit through the API, which GitHub signs, on a
 // new branch, and a pull request that runs the checks and the review of the
 // repository as any other.
+//
+// Those checks run at once, with the secrets of the target repository, before its
+// owner has read the change: a fix therefore doesn't change what the CI runs, its
+// workflows and actions, unless the owner allows it with PAGER_FIX_WORKFLOWS.
 
 /** The most files and bytes that a fix may change. */
 export const LIMIT = { files: 100, bytes: 5 * 1024 * 1024 };
@@ -62,13 +66,34 @@ export function commitMessage(plan, user) {
   };
 }
 
+/**
+ * Whether GitHub Actions runs the file at a path: a workflow, a file of an action
+ * under .github/actions/, or the action.yml of an action anywhere, which a
+ * workflow may use by its path. Without regard to case, so that no spelling slips
+ * through on a file system that ignores it.
+ */
+export function runsInCi(path) {
+  const lower = path.toLowerCase();
+  return (
+    lower.startsWith(".github/workflows/") ||
+    lower.startsWith(".github/actions/") ||
+    /(^|\/)action\.ya?ml$/.test(lower)
+  );
+}
+
+/** Whether the variable PAGER_FIX_WORKFLOWS allows a fix of what the CI runs. */
+export function workflowsAllowed(value) {
+  return (value ?? "").trim().toLowerCase() === "true";
+}
+
 function refused(error) {
   return { url: "", error };
 }
 
 /**
  * Open the pull request of a fix. Returns its address, or the reason why there is
- * none; it throws only on what isn't a refusal of git or GitHub.
+ * none; it throws only on what isn't a refusal of git or GitHub. A change of what
+ * the CI runs is refused unless `workflows` is true.
  */
 export async function openPull({
   job,
@@ -80,6 +105,7 @@ export async function openPull({
   api,
   git,
   read,
+  workflows = false,
 }) {
   if (token === "") {
     return refused("PAGER_FIX_TOKEN isn't set in the control repository");
@@ -103,6 +129,13 @@ export async function openPull({
   if (changes.some((change) => ["120000", "160000"].includes(change.mode))) {
     return refused(
       "the change has a symbolic link or a submodule, which a commit through the API can't hold",
+    );
+  }
+  const ci = workflows ? [] : changes.filter((change) => runsInCi(change.path));
+  if (ci.length > 0) {
+    const more = ci.length > 1 ? ` and ${ci.length - 1} more` : "";
+    return refused(
+      `the change touches what the CI runs, which a fix doesn't change unless PAGER_FIX_WORKFLOWS allows it: ${ci[0].path}${more}`,
     );
   }
   const additions = [];

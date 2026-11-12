@@ -588,6 +588,20 @@ describe("the schemas and the tasks", () => {
     assert.match(fix, /A newer attempt runs or passed/);
     assert.match(fix, /Never guess\./);
     assert.doesNotMatch(fix, /turns/);
+    // What the CI runs isn't part of a fix, unless PAGER_FIX_WORKFLOWS allows it.
+    assert.match(
+      fix,
+      /`\.github\/workflows\/` or `\.github\/actions\/` or an `action\.yml`, isn't part of a fix: the checks of the pull request would run it with the secrets of the repository/,
+    );
+    assert.doesNotMatch(fix, /allows a fix to change one/);
+    const workflows = task(
+      { kind: "fix", repo: REPO },
+      ["failures.json"],
+      "",
+      true,
+    );
+    assert.match(workflows, /the maintainer allows a fix to change one\./);
+    assert.doesNotMatch(workflows, /isn't part of a fix/);
   });
 
   it("ask for the answers to the maintainer in the language of the pager, and keep a draft in the language of its thread", () => {

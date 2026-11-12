@@ -93,6 +93,46 @@ describe("prepare", () => {
     assert.equal(w.net.calls[0].headers.authorization, "Bearer ghs_test");
   });
 
+  it("tells a fix whether PAGER_FIX_WORKFLOWS allows it to change the CI", async () => {
+    const tasks = [];
+    for (const allowed of [undefined, "true"]) {
+      const w = await world(
+        new Net().on("GET", "/issues/9", () =>
+          json({ title: "A bot fails", body: "It does." }),
+        ),
+      );
+      const event = join(w.dir, "event.json");
+      await writeFile(
+        event,
+        JSON.stringify({
+          action: "pager-fix",
+          client_payload: {
+            item: ITEM,
+            repo: REPO,
+            kind: "alarm",
+            entries: [
+              {
+                label: "A bot fails",
+                url: `https://github.com/${REPO}/issues/9`,
+              },
+            ],
+          },
+        }),
+      );
+      const env = {
+        ...w.env,
+        GITHUB_EVENT_NAME: "repository_dispatch",
+        GITHUB_EVENT_PATH: event,
+        PAGER_INPUT: join(w.dir, "input"),
+        PAGER_FIX_WORKFLOWS: allowed,
+      };
+      assert.equal(await main("prepare", env, w.io), 0);
+      tasks.push(await readFile(join(w.dir, "input", "task.md"), "utf8"));
+    }
+    assert.match(tasks[0], /isn't part of a fix/);
+    assert.match(tasks[1], /the maintainer allows a fix to change one/);
+  });
+
   it("takes the event of the smoke test in place of GitHub's", async () => {
     const w = await world(
       new Net().on("POST", "/graphql", () => json({ data: {} })),
@@ -177,6 +217,51 @@ describe("pull-request", () => {
     assert.deepEqual(additions, [
       { path: "a.txt", contents: Buffer.from("new").toString("base64") },
     ]);
+  });
+
+  it("refuses a change of a workflow, unless PAGER_FIX_WORKFLOWS allows it", async () => {
+    const results = [];
+    for (const allowed of ["", "true"]) {
+      const net = new Net()
+        .on("GET", "/user", () => json({ login: "monalisa", id: 42 }))
+        .on("GET", `/repos/${REPO}`, () => json({ default_branch: "main" }))
+        .on("POST", "/git/refs", () => json({}, 201))
+        .on("POST", "/graphql", () => json({ data: {} }))
+        .on("POST", "/pulls", () =>
+          json({ html_url: `https://github.com/${REPO}/pull/41` }, 201),
+        );
+      const w = await world(net);
+      await mkdir(join(w.dir, "repo", ".github", "workflows"), {
+        recursive: true,
+      });
+      await writeFile(
+        join(w.dir, "repo", ".github", "workflows", "ci.yml"),
+        "on: push",
+      );
+      w.io.git = (args) =>
+        args[0] === "apply"
+          ? ""
+          : ":100644 100644 a b M .github/workflows/ci.yml ";
+      const env = {
+        ...w.env,
+        JOB: JSON.stringify(job),
+        PLAN: plan,
+        BASE: "c".repeat(40),
+        PAGER_FIX_TOKEN: "github_pat_test",
+        PAGER_FIX_WORKFLOWS: allowed,
+        PAGER_REPO: join(w.dir, "repo"),
+        PAGER_PATCH: join(w.dir, "fix.patch"),
+      };
+      assert.equal(await main("pull-request", env, w.io), 0);
+      results.push({ lines: w.lines, calls: net.calls.length });
+    }
+    assert.deepEqual(results[0], {
+      lines: [
+        "No pull request: the change touches what the CI runs, which a fix doesn't change unless PAGER_FIX_WORKFLOWS allows it: .github/workflows/ci.yml.",
+      ],
+      calls: 0,
+    });
+    assert.deepEqual(results[1].lines, [`https://github.com/${REPO}/pull/41`]);
   });
 
   it("says why there is none without its token, and refuses a wrong plan", async () => {

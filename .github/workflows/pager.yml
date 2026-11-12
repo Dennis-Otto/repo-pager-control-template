@@ -71,6 +71,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PAGER_INPUT: pager-input
+          PAGER_FIX_WORKFLOWS: ${{ vars.PAGER_FIX_WORKFLOWS }}
         run: node pager/job.mjs prepare
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -139,6 +140,8 @@ jobs:
           PLAN: ${{ needs.ask.outputs.plan }}
           BASE: ${{ needs.ask.outputs.base }}
           PAGER_FIX_TOKEN: ${{ secrets.PAGER_FIX_TOKEN }}
+          # A fix changes no workflow or action unless the owner sets it to true.
+          PAGER_FIX_WORKFLOWS: ${{ vars.PAGER_FIX_WORKFLOWS }}
           PAGER_REPO: repo
           PAGER_PATCH: ${{ github.workspace }}/fix/fix.patch
         run: node pager/job.mjs pull-request
