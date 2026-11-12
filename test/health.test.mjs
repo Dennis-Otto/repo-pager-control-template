@@ -8,16 +8,23 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
+import { GitHub } from "../pager/github.mjs";
 import {
   askPager,
   check,
   expiryOf,
   fixToken,
+  ISSUE_MARK,
+  ISSUE_TITLE,
+  issueText,
+  keepIssue,
+  pagerReport,
   problems,
+  problemsOf,
   summary,
 } from "../pager/health.mjs";
 import { main } from "../pager/job.mjs";
-import { json, Net } from "./fake.mjs";
+import { json, Net, OWNER, REPO } from "./fake.mjs";
 
 const NOW = Date.parse("2026-11-08T07:00:00Z");
 const HEADER = "github-authentication-token-expiration";
@@ -377,6 +384,7 @@ describe("the check", () => {
       sleep: async () => undefined,
     });
     assert.deepEqual(result.problems, []);
+    assert.equal(result.speaks, true);
     assert.deepEqual(net.to("/control")[0].body, {
       type: "health",
       tokens: { fix: "2026-12-04" },
@@ -403,27 +411,198 @@ describe("the check", () => {
   });
 });
 
+describe("the problems of a run, as the job issue reads them", () => {
+  it("are the texts of the JSON list, each on one line", () => {
+    assert.deepEqual(
+      problemsOf(JSON.stringify(["One\nproblem. ", "", 7, "Two."])),
+      ["One problem.", "Two."],
+    );
+  });
+
+  it("are none without an output, or for one that isn't a list", () => {
+    assert.deepEqual(problemsOf(undefined), []);
+    assert.deepEqual(problemsOf(""), []);
+    assert.deepEqual(problemsOf("{not json"), []);
+    assert.deepEqual(problemsOf('{"problems": ["x"]}'), []);
+  });
+});
+
+const RUN = "https://github.com/monalisa/control/actions/runs/7";
+
+describe("the text of the issue", () => {
+  it("opens with the mark, names the owner, the run and each problem", () => {
+    const text = issueText({
+      state: "opened",
+      problems: ["Telegram refuses the bot.", "A token expires."],
+      run: RUN,
+      owner: OWNER,
+    });
+    assert.ok(text.startsWith(`${ISSUE_MARK}\n@${OWNER}, `));
+    assert.match(
+      text,
+      /\[this run\]\(https:\/\/github\.com\/monalisa\/control\/actions\/runs\/7\)/,
+    );
+    assert.match(text, /^- Telegram refuses the bot\.\n- A token expires\.$/m);
+    assert.match(text, /needs neither the pager nor GitHub's mails of Actions/);
+    assert.match(text, /the next run that passes closes it/);
+  });
+
+  it("points to the log of a run that broke before the check named a problem", () => {
+    const text = issueText({ state: "commented", problems: [], run: RUN });
+    assert.match(text, /^The check failed again in \[this run\]/);
+    assert.match(
+      text,
+      /^- The run failed before the check could name a problem: its log says why\.$/m,
+    );
+    assert.doesNotMatch(text, /@/);
+  });
+
+  it("says that the pager is well again when it closes", () => {
+    assert.equal(
+      issueText({ state: "closed", run: RUN }),
+      `The check passed in [this run](${RUN}), so the pager is well again.\n`,
+    );
+  });
+});
+
+/** An open issue of the list of GitHub. */
+function issue(number, fields = {}) {
+  return {
+    number,
+    html_url: `https://github.com/${REPO}/issues/${number}`,
+    user: { login: "github-actions[bot]" },
+    body: `${ISSUE_MARK}\n@${OWNER}, the daily check failed.`,
+    ...fields,
+  };
+}
+
+const keep = (net, fields) =>
+  keepIssue({
+    api: new GitHub("actions-token", net.fetch),
+    repo: REPO,
+    problems: ["Telegram refuses the bot."],
+    run: RUN,
+    owner: OWNER,
+    ...fields,
+  });
+
+describe("the issue of a failed check", () => {
+  it("opens after a failure when none is open, and ignores what only looks like it", async () => {
+    const net = new Net()
+      .on("GET", /\/issues\?state=open&per_page=100&page=1$/, () =>
+        json([
+          issue(1, { pull_request: {} }),
+          issue(2, { user: { login: OWNER } }),
+          issue(3, { body: null }),
+        ]),
+      )
+      .on("POST", `/repos/${REPO}/issues`, () =>
+        json({ html_url: `https://github.com/${REPO}/issues/4` }, 201),
+      );
+    assert.deepEqual(await keep(net, { failed: true }), {
+      state: "opened",
+      url: `https://github.com/${REPO}/issues/4`,
+    });
+    const [opened] = net.to(`/repos/${REPO}/issues`);
+    assert.equal(opened.body.title, ISSUE_TITLE);
+    assert.match(opened.body.body, /^- Telegram refuses the bot\.$/m);
+    assert.equal(opened.headers.authorization, "Bearer actions-token");
+  });
+
+  it("comments on the open one after a failure, on any page of the list", async () => {
+    const others = Array.from({ length: 100 }, (_, index) =>
+      issue(100 + index, { user: { login: OWNER } }),
+    );
+    const net = new Net()
+      .on("GET", /&page=1$/, () => json(others))
+      .on("GET", /&page=2$/, () => json([issue(9)]))
+      .on("POST", `/repos/${REPO}/issues/9/comments`, () => json({}, 201));
+    assert.deepEqual(await keep(net, { failed: true }), {
+      state: "commented",
+      url: `https://github.com/${REPO}/issues/9`,
+    });
+    const [comment] = net.to("/issues/9/comments");
+    assert.match(comment.body.body, /^The check failed again/);
+    assert.equal(net.calls.filter((call) => call.method === "PATCH").length, 0);
+  });
+
+  it("closes the open one after a run that passed, with a comment", async () => {
+    const net = new Net()
+      .on("GET", /&page=1$/, () => json([issue(9)]))
+      .on("POST", `/repos/${REPO}/issues/9/comments`, () => json({}, 201))
+      .on("PATCH", `/repos/${REPO}/issues/9`, () => json({}));
+    assert.deepEqual(await keep(net, { failed: false }), {
+      state: "closed",
+      url: `https://github.com/${REPO}/issues/9`,
+    });
+    assert.match(
+      net.to("/issues/9/comments")[0].body.body,
+      /pager is well again/,
+    );
+    assert.deepEqual(net.to(`/repos/${REPO}/issues/9`)[0].body, {
+      state: "closed",
+      state_reason: "completed",
+    });
+  });
+
+  it("does nothing after a run that passed when none is open", async () => {
+    const net = new Net().on("GET", /&page=1$/, () => json([]));
+    assert.deepEqual(await keep(net, { failed: false }), {
+      state: "none",
+      url: "",
+    });
+    assert.equal(net.calls.length, 1);
+  });
+});
+
+describe("the report of the problems for the pager", () => {
+  it("is the failure of no thing, with each problem and the run", () => {
+    assert.deepEqual(pagerReport(["A token expires."], RUN), {
+      type: "failed",
+      text: `The daily check Health found a problem of the pager:\n• A token expires.\n${RUN}`,
+    });
+    assert.match(
+      pagerReport(["One.", "Two."], RUN).text,
+      /^The daily check Health found 2 problems of the pager:\n• One\.\n• Two\.\n/,
+    );
+  });
+});
+
+/** The variables of GitHub that name the run. */
+const GITHUB = {
+  GITHUB_SERVER_URL: "https://github.com",
+  GITHUB_REPOSITORY: "monalisa/control",
+  GITHUB_RUN_ID: "7",
+  GITHUB_REPOSITORY_OWNER: OWNER,
+};
+
 describe("the command health", () => {
   async function run(net, fields = {}) {
     const dir = await mkdtemp(join(tmpdir(), "pager-health-"));
     const env = {
+      ...GITHUB,
       GITHUB_STEP_SUMMARY: join(dir, "summary"),
+      GITHUB_OUTPUT: join(dir, "output"),
       PAGER_URL: "https://pager.example",
       PAGER_CONTROL_SECRET: "control-secret",
       PAGER_FIX_TOKEN: "fix-token",
       ...fields,
     };
     await writeFile(env.GITHUB_STEP_SUMMARY, "");
+    await writeFile(env.GITHUB_OUTPUT, "");
     const lines = [];
     const code = await main("health", env, {
       fetch: net.fetch,
       sleep: async () => undefined,
       log: (line) => lines.push(line),
     });
+    const output = await readFile(env.GITHUB_OUTPUT, "utf8");
+    const value = /^problems<<(EOF_\S+)\n([\s\S]*?)\n\1$/m.exec(output);
     return {
       code,
       lines,
       summary: await readFile(env.GITHUB_STEP_SUMMARY, "utf8"),
+      problems: value === null ? null : JSON.parse(value[2]),
     };
   }
 
@@ -432,19 +611,29 @@ describe("the command health", () => {
     return well({ schedule: new Date().toISOString(), ...extra });
   }
 
-  it("passes when the pager is well, with its health in the summary", async () => {
+  /** The pager: its health for the check, and what a report gets. */
+  function pager(health, reported = () => new Response("said")) {
+    return (call) =>
+      call.body.type === "health" ? json(health) : reported(call);
+  }
+
+  it("passes when the pager is well, with its health in the summary and no problem", async () => {
     const net = new Net()
       .on("GET", "/rate_limit", limits())
-      .on("POST", "/control", () => json(now()));
+      .on("POST", "/control", pager(now()));
     const result = await run(net);
     assert.equal(result.code, 0);
     assert.deepEqual(result.lines, ["The pager is well."]);
     assert.match(result.summary, /### The health of the pager/);
+    assert.deepEqual(result.problems, []);
+    assert.equal(net.to("/control").length, 1);
   });
 
-  it("fails with one error per problem", async () => {
-    const net = new Net().on("POST", "/control", () =>
-      json(
+  it("fails with one error per problem, and says no problem in the chat while Telegram refuses the bot", async () => {
+    const net = new Net().on(
+      "POST",
+      "/control",
+      pager(
         now({
           telegram: { ok: false, error: "Telegram getMe: Unauthorized" },
           github: { ok: false, error: "GitHub answered 401: Bad JWT" },
@@ -457,9 +646,51 @@ describe("the command health", () => {
     assert.match(result.lines[0], /^::error::Telegram refuses the bot/);
     assert.match(result.lines[1], /^::error::GitHub refuses the app/);
     assert.match(result.summary, /- PAGER_FIX_TOKEN isn't set/);
+    assert.equal(result.problems.length, 2);
+    assert.equal(net.to("/control").length, 1);
   });
 
-  it("fails when the pager can't be asked", async () => {
+  it("has the pager say the problems in the chat when it answered", async () => {
+    const net = new Net().on(
+      "POST",
+      "/control",
+      pager(now({ github: { ok: false, error: "Bad JWT" } })),
+    );
+    const result = await run(net);
+    assert.equal(result.code, 1);
+    const [, report] = net.to("/control");
+    assert.equal(report.body.type, "failed");
+    assert.match(report.body.text, /^The daily check Health found a problem/);
+    assert.match(
+      report.body.text,
+      /https:\/\/github\.com\/monalisa\/control\/actions\/runs\/7$/,
+    );
+    assert.ok(report.headers["x-pager-signature"].startsWith("sha256="));
+    assert.deepEqual(result.lines, [
+      "::error::GitHub refuses the app of the pager: Bad JWT. Are GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY of the Worker still right?",
+    ]);
+  });
+
+  it("warns, and still fails on the problems, when the pager refuses the report", async () => {
+    const net = new Net().on(
+      "POST",
+      "/control",
+      pager(
+        now({ github: { ok: false, error: "Bad JWT" } }),
+        () => new Response("Bad Request", { status: 400 }),
+      ),
+    );
+    const result = await run(net);
+    assert.equal(result.code, 1);
+    assert.match(
+      result.lines[0],
+      /^::warning::Not sent: the pager doesn't take this body/,
+    );
+    assert.match(result.lines[1], /^::error::GitHub refuses the app/);
+    assert.equal(result.problems.length, 1);
+  });
+
+  it("fails when the pager can't be asked, and hands that on as the problem", async () => {
     const result = await run(new Net(), {
       PAGER_URL: undefined,
       PAGER_CONTROL_SECRET: undefined,
@@ -468,5 +699,147 @@ describe("the command health", () => {
     assert.equal(result.code, 1);
     assert.match(result.lines[0], /^::error::The variable PAGER_URL/);
     assert.equal(result.summary, "");
+    assert.equal(result.problems.length, 1);
+    assert.match(result.problems[0], /^The variable PAGER_URL/);
+  });
+
+  it("hands on no problem of an error that is no refusal, which the job issue then names", async () => {
+    // GITHUB_OUTPUT isn't set: writing it would fail the test with another error.
+    const env = {
+      ...GITHUB,
+      PAGER_URL: "https://pager.example",
+      PAGER_CONTROL_SECRET: "control-secret",
+    };
+    await assert.rejects(
+      main("health", env, {
+        fetch: () => {
+          throw new TypeError("fetch failed");
+        },
+        sleep: () => {
+          throw new RangeError("a bug of the job");
+        },
+        log: () => undefined,
+      }),
+      RangeError,
+    );
+  });
+});
+
+describe("the command health-issue", () => {
+  async function run(net, fields = {}) {
+    const lines = [];
+    const code = await main(
+      "health-issue",
+      { ...GITHUB, GH_TOKEN: "actions-token", ...fields },
+      { fetch: net.fetch, log: (line) => lines.push(line) },
+    );
+    return { code, lines };
+  }
+
+  it("opens the issue after a failure, with the problems of the job health", async () => {
+    const net = new Net()
+      .on("GET", /&page=1$/, () => json([]))
+      .on("POST", "/repos/monalisa/control/issues", () =>
+        json({ html_url: "https://github.com/monalisa/control/issues/4" }, 201),
+      );
+    const result = await run(net, {
+      HEALTH_RESULT: "failure",
+      HEALTH_PROBLEMS: JSON.stringify(["A token expires."]),
+    });
+    assert.deepEqual(result, {
+      code: 0,
+      lines: [
+        "The failure is in the issue https://github.com/monalisa/control/issues/4.",
+      ],
+    });
+    const [opened] = net.to("/repos/monalisa/control/issues");
+    assert.match(opened.body.body, new RegExp(`^@${OWNER}, `, "m"));
+    assert.match(opened.body.body, /^- A token expires\.$/m);
+    assert.match(opened.body.body, /\/monalisa\/control\/actions\/runs\/7\)/);
+  });
+
+  it("comments on the open issue after a failure that named no problem", async () => {
+    const net = new Net()
+      .on("GET", /&page=1$/, () => json([issue(9)]))
+      .on("POST", `/repos/monalisa/control/issues/9/comments`, () =>
+        json({}, 201),
+      );
+    const result = await run(net, { HEALTH_RESULT: "failure" });
+    assert.equal(result.code, 0);
+    assert.match(result.lines[0], /^The failure is a comment on the issue /);
+    assert.match(
+      net.to("/issues/9/comments")[0].body.body,
+      /before the check could name a problem/,
+    );
+  });
+
+  it("closes the open issue after a run that passed, or says that none is open", async () => {
+    const closing = new Net()
+      .on("GET", /&page=1$/, () => json([issue(9)]))
+      .on("POST", `/repos/monalisa/control/issues/9/comments`, () =>
+        json({}, 201),
+      )
+      .on("PATCH", "/repos/monalisa/control/issues/9", () => json({}));
+    assert.match(
+      (await run(closing, { HEALTH_RESULT: "success" })).lines[0],
+      /^The issue \S+ is closed: the pager is well again\.$/,
+    );
+    const none = new Net().on("GET", /&page=1$/, () => json([]));
+    assert.deepEqual(await run(none, { HEALTH_RESULT: "success" }), {
+      code: 0,
+      lines: ["No issue of a failed check is open."],
+    });
+  });
+
+  it("fails when GitHub refuses the issue of a failure, as when issues are off", async () => {
+    const net = new Net()
+      .on("GET", /&page=1$/, () => json([]))
+      .on("POST", "/repos/monalisa/control/issues", () =>
+        json({ message: "Issues are disabled for this repo" }, 410),
+      );
+    const result = await run(net, { HEALTH_RESULT: "failure" });
+    assert.equal(result.code, 1);
+    assert.match(
+      result.lines[0],
+      /^::error::GitHub answered 410: Issues are disabled for this repo\. The job needs the issues of this repository turned on and issues: write$/,
+    );
+  });
+
+  it("only warns when GitHub refuses after a run that passed, which stays green", async () => {
+    const net = new Net().on("GET", /&page=1$/, () =>
+      json({ message: "Resource not accessible by integration" }, 403),
+    );
+    const result = await run(net, { HEALTH_RESULT: "success" });
+    assert.equal(result.code, 0);
+    assert.match(
+      result.lines[0],
+      /^::warning::The issue of the check stays open: GitHub answered 403/,
+    );
+    assert.equal(
+      result.lines[1],
+      "The pager is well; its issue stays open until the next run.",
+    );
+  });
+
+  it("refuses a result that is neither failure nor success, and passes on an error of the network", async () => {
+    const refused = await run(new Net(), { HEALTH_RESULT: "cancelled" });
+    assert.equal(refused.code, 1);
+    assert.match(
+      refused.lines[0],
+      /^::error::HEALTH_RESULT is cancelled, not failure or success\.$/,
+    );
+    await assert.rejects(
+      main(
+        "health-issue",
+        { ...GITHUB, HEALTH_RESULT: "failure" },
+        {
+          fetch: () => {
+            throw new TypeError("fetch failed");
+          },
+          log: () => undefined,
+        },
+      ),
+      TypeError,
+    );
   });
 });

@@ -5,11 +5,14 @@ name: Health
 # names it, when the pager doesn't answer, its schedule stopped, Telegram refuses the
 # bot or its webhook failed in the last day, GitHub refuses the app, or a token
 # expires within a week. The pager writes only when something needs the maintainer, so
-# a quiet day can't tell that it is dead; GitHub notifies the maintainer of a failed run of a
-# schedule by itself, which works also when Telegram or the Worker is what broke. It
-# also reads the day on which PAGER_FIX_TOKEN expires from GitHub, with
-# GET /rate_limit, and sends it along, for the reminder of the pager. No Claude runs
-# here, and it takes about a minute of Actions a day.
+# a quiet day can't tell that it is dead. A failed run opens one issue in this
+# repository, The health check of the pager fails, or comments on the open one, and
+# the next run that passes closes it: that channel needs neither the Worker nor
+# GitHub's mails of Actions, which many owners of a pager turn off. While Telegram
+# takes the bot, the pager says the problems in the chat as well. It also reads the
+# day on which PAGER_FIX_TOKEN expires from GitHub, with GET /rate_limit, and sends
+# it along, for the reminder of the pager. No Claude runs here, and it takes about a
+# minute of Actions a day, and one more on a day that fails.
 
 on:
   schedule:
@@ -31,6 +34,10 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+      # For the last step alone, which closes the issue of a failed check.
+      issues: write
+    outputs:
+      problems: ${{ steps.check.outputs.problems }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -39,8 +46,39 @@ jobs:
         with:
           node-version-file: .nvmrc
       - name: Ask the pager for its health, signed
+        id: check
         env:
           PAGER_URL: ${{ vars.PAGER_URL }}
           PAGER_CONTROL_SECRET: ${{ secrets.PAGER_CONTROL_SECRET }}
           PAGER_FIX_TOKEN: ${{ secrets.PAGER_FIX_TOKEN }}
         run: node pager/job.mjs health
+      - name: Close the issue of a failed check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEALTH_RESULT: success
+        run: node pager/job.mjs health-issue
+
+  issue:
+    name: Report the failure in an issue
+    needs: health
+    # Any failure of the job health: a problem that the check named, or a run that
+    # broke before it could, whose issue then points to the log.
+    if: failure()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Open the issue of the failed check, or comment on it
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEALTH_RESULT: failure
+          HEALTH_PROBLEMS: ${{ needs.health.outputs.problems }}
+        run: node pager/job.mjs health-issue

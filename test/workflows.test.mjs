@@ -1,8 +1,9 @@
 // The promises of the README about the workflows, which the settings of the template
 // enforce on GitHub as well: only GitHub's own actions and anthropics/claude-code-action
 // run, each pinned to a commit (the Actions policy of selected actions with required SHA
-// pinning), every job gets contents: read at most, and the one exception, the workflow
-// Dependabot, merges only a pull request of Dependabot, in the template alone.
+// pinning), every job gets contents: read at most, and the two exceptions: the workflow
+// Dependabot merges only a pull request of Dependabot, in the template alone, and the
+// workflow Health keeps one issue of a failed check.
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -14,6 +15,9 @@ const WORKFLOWS = ".github/workflows";
 // The one workflow whose job writes, and what it may write.
 const MERGE = "dependabot.yml";
 const MERGE_PERMISSIONS = ["contents: write", "pull-requests: write"];
+// The workflow whose jobs keep the issue of a failed check, and what they may write.
+const HEALTH = "health.yml";
+const HEALTH_PERMISSIONS = ["contents: read", "issues: write"];
 // The actions that the Actions policy of the template allows besides GitHub's own.
 const ALLOWED = ["anthropics/claude-code-action"];
 
@@ -69,7 +73,10 @@ describe("the workflows of the template", {
       const granted = [
         ...text.matchAll(/^\s+([a-z-]+: (?:read|write))\s*$/gm),
       ].map(([, line]) => line);
-      const allowed = name === MERGE ? MERGE_PERMISSIONS : ["contents: read"];
+      const allowed = {
+        [MERGE]: MERGE_PERMISSIONS,
+        [HEALTH]: HEALTH_PERMISSIONS,
+      }[name] ?? ["contents: read"];
       assert.deepEqual(
         granted.filter((line) => !allowed.includes(line)),
         [],
@@ -109,5 +116,38 @@ describe("the workflow Dependabot", () => {
       text,
       /if \[ "\$\(gh api "repos\/\$REPOSITORY" --jq \.allow_auto_merge\)" != true \]; then\n\s+echo "::warning::[^"]+"\n\s+exit 0\n/,
     );
+  });
+});
+
+describe("the workflow Health", () => {
+  const text = read(`${WORKFLOWS}/${HEALTH}`);
+  const check = text.slice(text.indexOf("  health:"), text.indexOf("  issue:"));
+  const issue = text.slice(text.indexOf("  issue:"));
+
+  it("hands the problems of the check to the job issue, also of a run that failed", () => {
+    assert.match(
+      check,
+      /^ {6}problems: \$\{\{ steps\.check\.outputs\.problems \}\}$/m,
+    );
+    assert.match(check, /^ {8}id: check$/m);
+    assert.match(issue, /^ {4}needs: health$/m);
+    assert.match(issue, /^ {4}if: failure\(\)$/m);
+    assert.match(
+      issue,
+      /^ {10}HEALTH_RESULT: failure\n {10}HEALTH_PROBLEMS: \$\{\{ needs\.health\.outputs\.problems \}\}\n {8}run: node pager\/job\.mjs health-issue$/m,
+    );
+  });
+
+  it("closes the issue only after the check passed, and gives the step of the secrets no token of GitHub", () => {
+    assert.match(
+      check,
+      /^ {6}- name: Close the issue of a failed check\n {8}env:\n {10}GH_TOKEN: \$\{\{ github\.token \}\}\n {10}HEALTH_RESULT: success\n {8}run: node pager\/job\.mjs health-issue$/m,
+    );
+    const secrets = check.slice(
+      check.indexOf("id: check"),
+      check.indexOf("- name: Close the issue"),
+    );
+    assert.match(secrets, /PAGER_CONTROL_SECRET/);
+    assert.doesNotMatch(secrets, /GH_TOKEN|github\.token|if:/);
   });
 });
