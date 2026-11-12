@@ -22,6 +22,7 @@ import {
   settingsOf,
   summaryOf,
   takeTemplate,
+  WORK,
 } from "../pager/template.mjs";
 import { json, Net } from "./fake.mjs";
 
@@ -31,6 +32,7 @@ const sha = (letter) => letter.repeat(40);
 const HEAD = sha("a");
 const OLD = sha("b");
 const LATEST = sha("c");
+const MADE = sha("d");
 
 const base64 = (text) => Buffer.from(text).toString("base64");
 const settings = (fields = {}) =>
@@ -101,13 +103,23 @@ function github({
     )
     .on("POST", `/repos/${HOME}/git/refs`, ref)
     .on("PATCH", `/repos/${HOME}/git/refs/heads/${BRANCH}`, () => json({}))
+    .on("PATCH", `/repos/${HOME}/git/refs/heads/${WORK}`, () => json({}))
+    .on("DELETE", `/repos/${HOME}/git/refs/heads/${WORK}`, () =>
+      Response.json(null, { status: 204 }),
+    )
     .on("POST", "/graphql", () =>
-      json({ data: { createCommitOnBranch: { commit: { oid: "d" } } } }),
+      json({ data: { createCommitOnBranch: { commit: { oid: MADE } } } }),
     )
     .on("POST", `/repos/${HOME}/pulls`, () =>
       json({ html_url: `https://github.com/${HOME}/pull/8` }, 201),
     )
-    .on("PATCH", `/repos/${HOME}/pulls/7`, () => json({}));
+    .on("PATCH", `/repos/${HOME}/pulls/7`, () =>
+      json({
+        number: 7,
+        state: "open",
+        html_url: `https://github.com/${HOME}/pull/7`,
+      }),
+    );
   if (here !== null) {
     net.on("GET", `/repos/${HOME}/contents/${SETTINGS}?ref=${HEAD}`, () =>
       json({ content: base64(here) }),
@@ -119,6 +131,39 @@ function github({
     );
   }
   return net;
+}
+
+/**
+ * GitHub as it treats the open pull request 7 of BRANCH: a head moved to a commit
+ * that the base has already, the tip of the default branch, closes it, and it
+ * won't open again while its head has no commit of its own.
+ */
+function closing(net) {
+  const pull = { head: sha("e"), state: "open" };
+  const answer = () =>
+    json({
+      number: 7,
+      state: pull.state,
+      html_url: `https://github.com/${HOME}/pull/7`,
+    });
+  net
+    .on("PATCH", `/repos/${HOME}/git/refs/heads/${BRANCH}`, (call) => {
+      pull.head = call.body.sha;
+      if (pull.head === HEAD) {
+        pull.state = "closed";
+      }
+      return json({});
+    })
+    .on("PATCH", `/repos/${HOME}/pulls/7`, (call) => {
+      if (call.body.state === "open" && pull.state === "closed") {
+        if (pull.head === HEAD) {
+          return json({ message: "Validation Failed" }, 422);
+        }
+        pull.state = "open";
+      }
+      return answer();
+    });
+  return pull;
 }
 
 const take = (net, write = true) =>
@@ -275,14 +320,21 @@ describe("the pull request of the template", () => {
       commit: LATEST,
       changes: CHANGES,
     });
-    assert.deepEqual(net.to(`/repos/${HOME}/git/refs`)[0].body, {
-      ref: `refs/heads/${BRANCH}`,
-      sha: HEAD,
-    });
+    assert.deepEqual(
+      net.to(`/repos/${HOME}/git/refs`).map((call) => call.body),
+      [
+        { ref: `refs/heads/${WORK}`, sha: HEAD },
+        { ref: `refs/heads/${BRANCH}`, sha: MADE },
+      ],
+    );
+    assert.deepEqual(
+      net.to(`/git/refs/heads/${WORK}`).map((call) => call.method),
+      ["DELETE"],
+    );
     const { input } = net.to("/graphql")[0].body.variables;
     assert.deepEqual(input.branch, {
       repositoryNameWithOwner: HOME,
-      branchName: BRANCH,
+      branchName: WORK,
     });
     assert.equal(input.expectedHeadOid, HEAD);
     assert.equal(
@@ -320,18 +372,76 @@ describe("the pull request of the template", () => {
       ],
       ref: () => json({ message: "Reference already exists" }, 422),
     });
+    const pull = closing(net);
     const result = await take(net);
     assert.equal(result.state, "updated");
     assert.equal(result.url, `https://github.com/${HOME}/pull/7`);
-    assert.deepEqual(net.to(`/git/refs/heads/${BRANCH}`)[0].body, {
-      sha: HEAD,
-      force: true,
-    });
-    assert.equal(
-      net.to(`/repos/${HOME}/pulls/7`)[0].body.title,
-      "chore: take the template up to cccccccccccc",
+    assert.deepEqual(pull, { head: MADE, state: "open" });
+    assert.deepEqual(
+      net.to(`/git/refs/heads/${BRANCH}`).map((call) => call.body),
+      [{ sha: MADE, force: true }],
     );
+    assert.deepEqual(
+      net.to(`/git/refs/heads/${WORK}`).map((call) => [call.method, call.body]),
+      [
+        ["PATCH", { sha: HEAD, force: true }],
+        ["DELETE", undefined],
+      ],
+    );
+    const patched = net.to(`/repos/${HOME}/pulls/7`)[0].body;
+    assert.equal(patched.title, "chore: take the template up to cccccccccccc");
+    assert.equal(patched.state, "open");
     assert.equal(net.to(`/repos/${HOME}/pulls`).length, 0);
+  });
+
+  it("opens the pull request again that someone closed meanwhile", async () => {
+    const net = github({
+      open: [{ number: 7, body: `<!-- template ${OLD} onto ${HEAD} -->` }],
+      ref: () => json({ message: "Reference already exists" }, 422),
+    });
+    const pull = closing(net);
+    pull.state = "closed";
+    const result = await take(net);
+    assert.equal(result.state, "updated");
+    assert.equal(result.url, `https://github.com/${HOME}/pull/7`);
+    assert.equal(pull.state, "open");
+  });
+
+  it("opens a new pull request when GitHub won't open the old one again", async () => {
+    const open = [{ number: 7, body: `<!-- template ${OLD} onto ${HEAD} -->` }];
+    const merged = github({ open }).on("PATCH", `/repos/${HOME}/pulls/7`, () =>
+      json({ message: "Validation Failed" }, 422),
+    );
+    const result = await take(merged);
+    assert.equal(result.state, "opened");
+    assert.equal(result.url, `https://github.com/${HOME}/pull/8`);
+    assert.equal(merged.to(`/repos/${HOME}/pulls`)[0].body.head, BRANCH);
+    const closed = github({ open }).on("PATCH", `/repos/${HOME}/pulls/7`, () =>
+      json({ number: 7, state: "closed" }),
+    );
+    assert.equal((await take(closed)).state, "opened");
+    const refused = github({ open }).on("PATCH", `/repos/${HOME}/pulls/7`, () =>
+      json({ message: "Resource not accessible" }, 403),
+    );
+    await assert.rejects(take(refused), { status: 403 });
+  });
+
+  it("deletes the branch of its commit also when the commit fails", async () => {
+    const net = github().on("POST", "/graphql", () =>
+      json({ errors: [{ message: "Expected head is outdated" }] }),
+    );
+    await assert.rejects(take(net), { message: /Expected head is outdated/ });
+    assert.deepEqual(
+      net.to(`/git/refs/heads/${WORK}`).map((call) => call.method),
+      ["DELETE"],
+    );
+    assert.equal(net.to(`/repos/${HOME}/git/refs`).length, 1);
+    const kept = github().on(
+      "DELETE",
+      `/repos/${HOME}/git/refs/heads/${WORK}`,
+      () => json({ message: "Reference does not exist" }, 422),
+    );
+    assert.equal((await take(kept)).state, "opened");
   });
 
   it("brings the same change again when the default branch moved on", async () => {
