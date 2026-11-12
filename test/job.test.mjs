@@ -133,6 +133,64 @@ describe("prepare", () => {
     assert.match(tasks[1], /the maintainer allows a fix to change one/);
   });
 
+  it("holds the job with PAGER_PAUSED and PAGER_DAILY_RUNS, and says why", async () => {
+    const event = async (w, action, payload) => {
+      const path = join(w.dir, "event.json");
+      await writeFile(
+        path,
+        JSON.stringify({ action, client_payload: payload }),
+      );
+      return {
+        ...w.env,
+        GITHUB_EVENT_NAME: "repository_dispatch",
+        GITHUB_EVENT_PATH: path,
+        GITHUB_REPOSITORY: "monalisa/repo-pager-control",
+        PAGER_INPUT: join(w.dir, "input"),
+      };
+    };
+    const paused = await world();
+    const text = await event(paused, "pager-text", { text: "Hi", message: 3 });
+    assert.equal(
+      await main("prepare", { ...text, PAGER_PAUSED: "yes" }, paused.io),
+      0,
+    );
+    assert.deepEqual(paused.lines, [
+      "A job of the kind text, which Claude doesn't run: the jobs of the pager are paused by PAGER_PAUSED; delete the variable to start them again.",
+    ]);
+    assert.match(outputs(await paused.read("output")).error, /PAGER_PAUSED/);
+    assert.equal(paused.net.calls.length, 0);
+    // Spaces alone pause nothing; today's runs of this repository count.
+    const capped = await world(
+      new Net().on("GET", /\/actions\/workflows\/pager\.yml\/runs\?/, () =>
+        json({
+          workflow_runs: [
+            { id: 5, display_title: "pager-translate (by itself)" },
+          ],
+        }),
+      ),
+    );
+    const translate = await event(capped, "pager-translate", {
+      item: ITEM,
+      repo: REPO,
+      of: "0a1b2c3d",
+      lines: ["a line"],
+      language: "de",
+    });
+    assert.equal(
+      await main(
+        "prepare",
+        { ...translate, PAGER_PAUSED: " ", PAGER_DAILY_RUNS: " 1 " },
+        capped.io,
+      ),
+      0,
+    );
+    assert.match(capped.lines[0], /reached PAGER_DAILY_RUNS, 1;/);
+    assert.match(
+      capped.net.calls[0].url,
+      /\/repos\/monalisa\/repo-pager-control\/actions\/workflows\/pager\.yml\/runs\?/,
+    );
+  });
+
   it("takes the event of the smoke test in place of GitHub's", async () => {
     const w = await world(
       new Net().on("POST", "/graphql", () => json({ data: {} })),

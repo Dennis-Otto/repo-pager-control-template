@@ -635,19 +635,80 @@ export async function failures(api, job) {
 }
 
 /**
- * Prepare a job: check its event, collect its data into out and return the job and
- * the outputs of the step, which name the limits and the schema of its kind.
+ * The end of the title of a run that started by itself, which `run-name` of
+ * pager.yml writes and PAGER_DAILY_RUNS counts: the two must say the same.
  */
-export async function prepare({
-  eventName,
-  event,
-  owner,
-  api,
-  out,
-  read,
-  workflows = false,
-}) {
-  const job = readJob(eventName, event, owner);
+export const BY_ITSELF = " (by itself)";
+const WORKFLOW = "pager.yml";
+const PAGE = 100;
+
+/**
+ * Whether a job started without a press of the owner: a translation, which the
+ * pager asks for with each release, and the draft of a discussion, which it asks
+ * for with each discussion or comment of someone else. The pager doesn't tell a
+ * press of ✍️ Draft a reply on a discussion apart, so that counts too.
+ */
+export function byItself(job) {
+  return (
+    job.kind === "translate" ||
+    (job.kind === "draft" && job.discussion === true)
+  );
+}
+
+/** The runs of today, in UTC, that started by themselves, besides this one, up to limit. */
+async function runsOfToday(api, { repository, run, now, limit }) {
+  const day = new Date(now()).toISOString().slice(0, 10);
+  const created = encodeURIComponent(`>=${day}T00:00:00Z`);
+  let count = 0;
+  for (let page = 1; ; page += 1) {
+    const found = await api.get(
+      `/repos/${repository}/actions/workflows/${WORKFLOW}/runs?event=repository_dispatch&created=${created}&per_page=${PAGE}&page=${page}`,
+    );
+    const runs = found?.workflow_runs ?? [];
+    count += runs.filter(
+      (other) =>
+        String(other.id) !== String(run) &&
+        String(other.display_title ?? "").endsWith(BY_ITSELF),
+    ).length;
+    if (count >= limit || runs.length < PAGE) {
+      return count;
+    }
+  }
+}
+
+/**
+ * Why Claude doesn't run for this job, or "" when it does: PAGER_PAUSED with any
+ * value holds every job, and PAGER_DAILY_RUNS the jobs that start by themselves
+ * once today's are spent. The answer of the run then says why, so the pager brings
+ * the button of a thing back at once. A press of the owner never counts.
+ */
+export async function held(job, api, { paused, daily, ...today }) {
+  if (paused) {
+    return "the jobs of the pager are paused by PAGER_PAUSED; delete the variable to start them again";
+  }
+  if (daily === "" || !byItself(job)) {
+    return "";
+  }
+  if (!/^\d+$/.test(daily)) {
+    return `PAGER_DAILY_RUNS isn't a whole number from 0 but ${daily.slice(0, 40)}, so no job that starts by itself runs`;
+  }
+  const limit = Number(daily);
+  let count;
+  try {
+    count = await runsOfToday(api, { ...today, limit });
+  } catch (failure) {
+    if (!(failure instanceof GitHubError)) {
+      throw failure;
+    }
+    return `today's runs of the pager didn't come from GitHub, so PAGER_DAILY_RUNS can't be kept: ${failure.message}`;
+  }
+  return count < limit
+    ? ""
+    : `today's runs that start by themselves, drafts of discussions and translations, reached PAGER_DAILY_RUNS, ${limit}; the count starts again at 00:00 UTC`;
+}
+
+/** Collect what Claude reads for a job, and why it can't run without it, if so. */
+async function collect(job, { api, owner, read }) {
   const files = {};
   let error = "";
   if (job.kind === "text") {
@@ -687,6 +748,31 @@ export async function prepare({
     files["failures.json"] = JSON.stringify(found.entries, null, 1);
     Object.assign(files, found.logs);
   }
+  return { files, error };
+}
+
+/**
+ * Prepare a job: check its event, collect its data into out and return the job and
+ * the outputs of the step, which name the limits and the schema of its kind. With
+ * hold, the job keeps PAGER_PAUSED and PAGER_DAILY_RUNS: a job that they hold
+ * collects nothing, and its error says why.
+ */
+export async function prepare({
+  eventName,
+  event,
+  owner,
+  api,
+  out,
+  read,
+  workflows = false,
+  hold,
+}) {
+  const job = readJob(eventName, event, owner);
+  const why = hold === undefined ? "" : await held(job, api, hold);
+  const { files, error } =
+    why === ""
+      ? await collect(job, { api, owner, read })
+      : { files: {}, error: why };
   // A translation has no tool to read a file with: its task holds its notes, between
   // lines that no note can hold, and is its prompt; data/task.md keeps it for the
   // maintainer, who may look at what Claude got.
