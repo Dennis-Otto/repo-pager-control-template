@@ -8,6 +8,8 @@
 //                                     the pager, signed (agents.yml)
 //   node pager/job.mjs health         ask the pager for its health, signed, and
 //                                     fail on what is wrong (health.yml)
+//   node pager/job.mjs health-issue   open or comment on the issue of a failed
+//                                     check, or close it after one that passed
 //   node pager/job.mjs template       bring the changes of the template as a pull
 //                                     request, and tell the pager (template.yml)
 //   node pager/job.mjs access         check that the token of the workflow reads
@@ -38,7 +40,7 @@ import {
 } from "./core.mjs";
 import { deliver } from "./deliver.mjs";
 import { GitHub } from "./github.mjs";
-import { check } from "./health.mjs";
+import { check, keepIssue, pagerReport, problemsOf } from "./health.mjs";
 import { prepare } from "./prepare.mjs";
 import { openPull, workflowsAllowed } from "./pull.mjs";
 import { checkSmokeFix, denialsOf, prepareSmokeFix } from "./smoke.mjs";
@@ -84,6 +86,11 @@ async function transcript(folder) {
 
 function owner(env) {
   return env.PAGER_OWNER || env.GITHUB_REPOSITORY_OWNER;
+}
+
+/** The address of the run of the workflow, from GitHub's own variables. */
+function runOf(env) {
+  return `${env.GITHUB_SERVER_URL}/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}`;
 }
 
 /**
@@ -224,23 +231,95 @@ const commands = {
   },
 
   async health(env, io) {
-    const { summary, problems } = await check({
-      url: env.PAGER_URL ?? "",
-      secret: env.PAGER_CONTROL_SECRET ?? "",
-      token: env.PAGER_FIX_TOKEN ?? "",
-      fetcher: io.fetch,
-      now: Date.now,
-      sleep: io.sleep,
-    });
-    await appendFile(env.GITHUB_STEP_SUMMARY, summary);
-    if (problems.length > 0) {
-      // One annotation per problem; the last one fails the step.
-      for (const problem of problems.slice(0, -1)) {
-        io.log(annotation("error", problem));
+    let result;
+    try {
+      result = await check({
+        url: env.PAGER_URL ?? "",
+        secret: env.PAGER_CONTROL_SECRET ?? "",
+        token: env.PAGER_FIX_TOKEN ?? "",
+        fetcher: io.fetch,
+        now: Date.now,
+        sleep: io.sleep,
+      });
+    } catch (error) {
+      if (error instanceof Refusal) {
+        // The job issue names the problem; the pager didn't answer, so it can't.
+        await writeOutputs(env.GITHUB_OUTPUT, {
+          problems: JSON.stringify([error.message]),
+        });
       }
-      throw new Refusal(problems.at(-1));
+      throw error;
     }
-    return "The pager is well.";
+    const { summary, problems, speaks } = result;
+    await appendFile(env.GITHUB_STEP_SUMMARY, summary);
+    await writeOutputs(env.GITHUB_OUTPUT, {
+      problems: JSON.stringify(problems),
+    });
+    if (problems.length === 0) {
+      return "The pager is well.";
+    }
+    if (speaks) {
+      // The pager answered, so it says the problems in the chat too; the issue of
+      // the job issue stays the record, also when this doesn't arrive.
+      const sent = await deliver({
+        url: env.PAGER_URL,
+        secret: env.PAGER_CONTROL_SECRET,
+        body: pagerReport(problems, runOf(env)),
+        fetcher: io.fetch,
+        sleep: io.sleep,
+      });
+      if (!sent.sent) {
+        io.log(annotation("warning", sent.note));
+      }
+    }
+    // One annotation per problem; the last one fails the step.
+    for (const problem of problems.slice(0, -1)) {
+      io.log(annotation("error", problem));
+    }
+    throw new Refusal(problems.at(-1));
+  },
+
+  async "health-issue"(env, io) {
+    const failed = { failure: true, success: false }[env.HEALTH_RESULT];
+    if (failed === undefined) {
+      throw new Refusal(
+        `HEALTH_RESULT is ${env.HEALTH_RESULT}, not failure or success.`,
+      );
+    }
+    let kept;
+    try {
+      kept = await keepIssue({
+        api: new GitHub(env.GH_TOKEN, io.fetch),
+        repo: env.GITHUB_REPOSITORY,
+        failed,
+        problems: problemsOf(env.HEALTH_PROBLEMS),
+        run: runOf(env),
+        owner: owner(env),
+      });
+    } catch (error) {
+      if (failed && error?.status === undefined) {
+        throw error;
+      }
+      const why =
+        error?.status === undefined
+          ? String(error)
+          : `${error.message}. The job needs the issues of this repository turned on and issues: write`;
+      if (failed) {
+        throw new Refusal(why);
+      }
+      // A check that passed stays green, whatever went wrong with GitHub,
+      // even its network; the issue waits for the next run.
+      io.log(
+        annotation("warning", `The issue of the check stays open: ${why}.`),
+      );
+      return "The pager is well; its issue stays open until the next run.";
+    }
+    return {
+      opened: `The failure is in the issue ${kept.url}.`,
+      commented: `The failure is a comment on the issue ${kept.url}.`,
+      closed: `The issue ${kept.url} is closed: the pager is well again.`,
+      none: "No issue of a failed check is open.",
+    }[kept.state];
   },
 
   async template(env, io) {
@@ -298,7 +377,7 @@ export async function main(command, env, io) {
     io.log(
       annotation(
         "error",
-        `Unknown command ${command}: prepare, access, smoke-fix, smoke-fix-check, pull-request, answer, forward, health or template.`,
+        `Unknown command ${command}: prepare, access, smoke-fix, smoke-fix-check, pull-request, answer, forward, health, health-issue or template.`,
       ),
     );
     return 2;

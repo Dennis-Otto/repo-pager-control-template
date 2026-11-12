@@ -4,8 +4,10 @@
 // answer, a schedule that stopped, Telegram or GitHub that refuse it, a webhook of
 // Telegram that fails, or a token that expires within a week. It reads the day of
 // PAGER_FIX_TOKEN from GitHub and sends it along, for the reminder of the pager. A
-// failed run reaches the maintainer by GitHub's own notification, which works also when
-// Telegram or the Worker is what broke. No token goes into the log or the summary.
+// failed run reaches the maintainer by one issue of this repository, which needs
+// neither the Worker nor GitHub's mails of Actions, which many owners of a pager turn
+// off; while Telegram takes the bot, the pager says the problems in the chat as well.
+// No token goes into the log, the summary or the issue.
 import { PASSING, pause, Refusal, signature } from "./core.mjs";
 import { GitHub, GitHubError } from "./github.mjs";
 
@@ -293,5 +295,120 @@ export async function check({ url, secret, token, fetcher, now, sleep }) {
   };
   const health = await askPager({ url, secret, body, fetcher, now, sleep });
   found.push(...problems(health, now()));
-  return { summary: summary(health, notes), problems: found };
+  return {
+    summary: summary(health, notes),
+    problems: found,
+    // Whether the pager can say the problems in the chat: not while Telegram
+    // refuses its bot.
+    speaks: health.telegram.ok === true,
+  };
+}
+
+/** The title of the one issue of a failed check, as the job opens it. */
+export const ISSUE_TITLE = "The health check of the pager fails";
+/** The mark at the start of its body, by which the job finds it again. */
+export const ISSUE_MARK = "<!-- pager-health -->";
+/** The account of GITHUB_TOKEN, which opens the issue. */
+const ACTIONS = "github-actions[bot]";
+
+/**
+ * The problems of a run from the output of the job health: a JSON list of texts;
+ * an empty list for anything else, such as no output of a run that broke before
+ * the check could name a problem.
+ */
+export function problemsOf(text) {
+  let value = null;
+  try {
+    value = JSON.parse(text ?? "");
+  } catch {
+    // No output: no problem that the check named.
+  }
+  return Array.isArray(value)
+    ? value
+        .filter((problem) => typeof problem === "string")
+        .map((problem) => problem.replace(/\s+/g, " ").trim())
+        .filter((problem) => problem !== "")
+    : [];
+}
+
+/** The problems as a list of Markdown, or why there is none. */
+function listOf(problems) {
+  return problems.length === 0
+    ? "- The run failed before the check could name a problem: its log says why."
+    : problems.map((problem) => `- ${problem}`).join("\n");
+}
+
+/**
+ * The text of the issue of a failed check: the body that opens it, which names
+ * the owner so that GitHub notifies them, a comment for each further failure, or the
+ * comment that closes it after a run that passed.
+ */
+export function issueText({ state, problems = [], run, owner }) {
+  const link = `[this run](${run})`;
+  if (state === "opened") {
+    return `${ISSUE_MARK}\n@${owner}, the daily check *Health* of the pager failed in ${link}:\n\n${listOf(problems)}\n\nThe pager writes only when something needs you, and while it is broken it may write nothing at all, so the check reports here: this issue needs neither the pager nor GitHub's mails of Actions. Each further failure adds a comment, and the next run that passes closes it.\n`;
+  }
+  if (state === "commented") {
+    return `The check failed again in ${link}:\n\n${listOf(problems)}\n`;
+  }
+  return `The check passed in ${link}, so the pager is well again.\n`;
+}
+
+/** The open issue of a failed check, or null: GITHUB_TOKEN's with the mark. */
+async function openIssue(api, repo) {
+  for (let page = 1; ; page += 1) {
+    const issues = await api.get(
+      `/repos/${repo}/issues?state=open&per_page=100&page=${page}`,
+    );
+    const found = issues.find(
+      (issue) =>
+        issue.pull_request === undefined &&
+        issue.user?.login === ACTIONS &&
+        (issue.body ?? "").startsWith(ISSUE_MARK),
+    );
+    if (found !== undefined || issues.length < 100) {
+      return found ?? null;
+    }
+  }
+}
+
+/**
+ * Keep the one issue of a failed check: open it, or comment on the open one,
+ * after a failed run; close it after a run that passed. Returns what it did and
+ * the address of the issue, if any.
+ */
+export async function keepIssue({ api, repo, failed, problems, run, owner }) {
+  const open = await openIssue(api, repo);
+  if (failed && open === null) {
+    const opened = await api.post(`/repos/${repo}/issues`, {
+      title: ISSUE_TITLE,
+      body: issueText({ state: "opened", problems, run, owner }),
+    });
+    return { state: "opened", url: opened.html_url };
+  }
+  if (open === null) {
+    return { state: "none", url: "" };
+  }
+  const state = failed ? "commented" : "closed";
+  await api.post(`/repos/${repo}/issues/${open.number}/comments`, {
+    body: issueText({ state, problems, run, owner }),
+  });
+  if (!failed) {
+    await api.json("PATCH", `/repos/${repo}/issues/${open.number}`, {
+      state: "closed",
+      state_reason: "completed",
+    });
+  }
+  return { state, url: open.html_url };
+}
+
+/**
+ * What the pager says in the chat of the problems of a check: in its main view,
+ * as the failure of a job that no thing has.
+ */
+export function pagerReport(problems, run) {
+  return {
+    type: "failed",
+    text: `The daily check Health found ${problems.length === 1 ? "a problem" : `${problems.length} problems`} of the pager:\n${problems.map((problem) => `• ${problem}`).join("\n")}\n${run}`,
+  };
 }
