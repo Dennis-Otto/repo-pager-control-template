@@ -560,7 +560,7 @@ describe("the command line", () => {
     assert.equal(await main("deploy", w.env, w.io), 2);
     assert.match(
       w.lines[0],
-      /Unknown command deploy: prepare, pull-request, answer, forward, health or template/,
+      /Unknown command deploy: prepare, access, pull-request, answer, forward, health or template/,
     );
     await assert.rejects(
       main("answer", { ...w.env, JOB: "not json" }, w.io),

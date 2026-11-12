@@ -49,11 +49,12 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
-      # The event that the pager sends for the notes of a release, for the pager's
-      # own repository of the owner of this one.
+      # The event that the pager sends for the notes of a release. Its repository
+      # must belong to the owner of this one, and prepare reads nothing of it for a
+      # translation: this repository, which every copy has.
       - name: Write the event of a translation
         env:
-          REPO: ${{ github.repository_owner }}/repo-pager
+          REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           jq -n --arg repo "$REPO" '{
