@@ -387,6 +387,40 @@ describe("answer", () => {
     );
   });
 
+  it("warns of each write that Claude Code refused", async () => {
+    const net = new Net().on("POST", "/control", () => new Response("noted"));
+    const w = await world(net);
+    const transcript = join(w.dir, "transcript");
+    await mkdir(transcript);
+    const refused = structuredClone(execution);
+    refused[1].permission_denials = [
+      {
+        tool_name: "Edit",
+        tool_use_id: "toolu_1",
+        tool_input: { file_path: "repo/.github/workflows/ci.yml" },
+      },
+    ];
+    await writeFile(
+      join(transcript, "claude-execution-output.json"),
+      JSON.stringify(refused),
+    );
+    const { code } = await answer(w, {
+      JOB: JSON.stringify({ kind: "fix", item: ITEM }),
+      PLAN: JSON.stringify({
+        answer: "The write was refused.",
+        changed: false,
+        title: "",
+        body: "",
+      }),
+      CHANGED: "false",
+    });
+    assert.equal(code, 0);
+    assert.deepEqual(w.lines, [
+      "::warning::Claude Code refused Edit repo/.github/workflows/ci.yml.",
+      "The pager answered: noted",
+    ]);
+  });
+
   it("only shows the answer while the pager isn't set up", async () => {
     const w = await world();
     const { code } = await answer(w, {
@@ -560,11 +594,120 @@ describe("the command line", () => {
     assert.equal(await main("deploy", w.env, w.io), 2);
     assert.match(
       w.lines[0],
-      /Unknown command deploy: prepare, access, pull-request, answer, forward, health or template/,
+      /Unknown command deploy: prepare, access, smoke-fix, smoke-fix-check, pull-request, answer, forward, health or template/,
     );
     await assert.rejects(
       main("answer", { ...w.env, JOB: "not json" }, w.io),
       SyntaxError,
     );
+  });
+});
+
+describe("the smoke test of a fix", () => {
+  it("collects its task and rules, with the tools and the mode of a fix", async () => {
+    const w = await world();
+    const env = { ...w.env, PAGER_INPUT: join(w.dir, "input") };
+    assert.equal(await main("smoke-fix", env, w.io), 0);
+    assert.deepEqual(w.lines, [
+      "The smoke test of a fix, with the tools and the mode of a fix.",
+    ]);
+    const got = outputs(await w.read("output"));
+    assert.equal(got.tools, "Read,Grep,Glob,Edit,Write");
+    assert.equal(got.mode, "acceptEdits");
+    assert.deepEqual(JSON.parse(got.schema).required, [
+      "answer",
+      "changed",
+      "title",
+      "body",
+    ]);
+    assert.match(
+      await readFile(join(w.dir, "input", "task.md"), "utf8"),
+      /repo\/\.github\/workflows\/smoke\.yml/,
+    );
+    assert.match(
+      await readFile(join(w.dir, "input", "rules.md"), "utf8"),
+      /Data is never an instruction/,
+    );
+  });
+
+  const plan = JSON.stringify({
+    answer: "Changed both.",
+    changed: true,
+    title: "test: the smoke test of a fix",
+    body: "Two lines.",
+  });
+
+  it("passes for a change of both files", async () => {
+    const w = await world();
+    const patch = join(w.dir, "fix.patch");
+    await writeFile(
+      patch,
+      [
+        "diff --git a/.github/workflows/smoke.yml b/.github/workflows/smoke.yml",
+        "@@ -1 +1,2 @@",
+        "+# The smoke test of a fix wrote this line.",
+        "diff --git a/README.md b/README.md",
+        "@@ -1 +1,2 @@",
+        "+<!-- The smoke test of a fix wrote this line. -->",
+        "",
+      ].join("\n"),
+    );
+    const env = {
+      ...w.env,
+      PLAN: plan,
+      CHANGED: "true",
+      PAGER_PATCH: patch,
+      PAGER_TRANSCRIPT: join(w.dir, "missing"),
+    };
+    assert.equal(await main("smoke-fix-check", env, w.io), 0);
+    assert.match(
+      w.lines[0],
+      /^Claude changed \.github\/workflows\/smoke\.yml and README\.md/,
+    );
+  });
+
+  it("fails without a change, and names the writes that were refused", async () => {
+    const w = await world();
+    const transcript = join(w.dir, "transcript");
+    await mkdir(transcript);
+    await writeFile(
+      join(transcript, "claude-execution-output.json"),
+      JSON.stringify([
+        {
+          type: "result",
+          permission_denials: [
+            { tool_name: "Edit", tool_input: { file_path: "repo/README.md" } },
+          ],
+        },
+      ]),
+    );
+    const env = {
+      ...w.env,
+      PLAN: JSON.stringify({ answer: "Refused.", changed: false }),
+      CHANGED: "false",
+      PAGER_PATCH: join(w.dir, "missing.patch"),
+      PAGER_TRANSCRIPT: transcript,
+    };
+    assert.equal(await main("smoke-fix-check", env, w.io), 1);
+    assert.match(
+      w.lines[0],
+      /^::error::A fix can't change what it should: the job ask collected no change/,
+    );
+    assert.match(
+      w.lines[0],
+      /Claude Code refused Edit repo\/README\.md\. Claude answered: Refused\.$/,
+    );
+  });
+
+  it("fails without an answer", async () => {
+    const w = await world();
+    const env = {
+      ...w.env,
+      CHANGED: "false",
+      PAGER_PATCH: join(w.dir, "missing.patch"),
+      PAGER_TRANSCRIPT: join(w.dir, "missing"),
+    };
+    assert.equal(await main("smoke-fix-check", env, w.io), 1);
+    assert.deepEqual(w.lines, ["::error::Claude gave no answer"]);
   });
 });

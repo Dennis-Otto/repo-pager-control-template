@@ -36,6 +36,7 @@ jobs:
     outputs:
       job: ${{ steps.prepare.outputs.job }}
       tools: ${{ steps.prepare.outputs.tools }}
+      mode: ${{ steps.prepare.outputs.mode }}
       turns: ${{ steps.prepare.outputs.turns }}
       budget: ${{ steps.prepare.outputs.budget }}
       model: ${{ steps.prepare.outputs.model }}
@@ -92,6 +93,7 @@ jobs:
     with:
       kind: translate
       tools: ${{ needs.prepare.outputs.tools }}
+      mode: ${{ needs.prepare.outputs.mode }}
       turns: ${{ needs.prepare.outputs.turns }}
       budget: ${{ needs.prepare.outputs.budget }}
       model: ${{ needs.prepare.outputs.model }}

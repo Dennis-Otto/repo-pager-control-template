@@ -1,0 +1,121 @@
+name: Smoke test of a fix
+
+# Proves in a pull request that changes the jobs of Claude that a fix can still
+# change files: Claude Code runs with the tools and the permission mode of a fix,
+# on a checkout of this repository, and adds a line to a workflow and to the
+# README. A new version of Claude Code or of its action that refuses such a write,
+# as a fix of 2026-11-06 was refused, fails here instead of in a fix. Nothing of
+# the change is committed, and it reaches no other job than the check: a tiny part
+# of the weekly limit, sent to nobody. A workflow of its own beside smoke.yml,
+# since each run of ask.yml keeps its data and its transcript under the same
+# names. By hand from the Actions tab as well.
+
+on:
+  pull_request:
+    paths:
+      - .github/egress-firewall.yaml
+      - .github/workflows/ask.yml
+      - .github/workflows/pager.yml
+      - .github/workflows/smoke-fix.yml
+      - pager/**
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: smoke-fix-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  prepare:
+    name: Prepare the smoke test of a fix
+    # As in smoke.yml: neither Dependabot's pull requests nor the template have a
+    # token of Claude, so each control repository runs this test.
+    if: github.actor != 'dependabot[bot]' && github.repository != 'Dennis-Otto/repo-pager-control-template'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      tools: ${{ steps.prepare.outputs.tools }}
+      mode: ${{ steps.prepare.outputs.mode }}
+      turns: ${{ steps.prepare.outputs.turns }}
+      budget: ${{ steps.prepare.outputs.budget }}
+      model: ${{ steps.prepare.outputs.model }}
+      effort: ${{ steps.prepare.outputs.effort }}
+      schema: ${{ steps.prepare.outputs.schema }}
+      prompt: ${{ steps.prepare.outputs.prompt }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Collect the task of the fix
+        id: prepare
+        env:
+          PAGER_INPUT: pager-input
+        run: node pager/job.mjs smoke-fix
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pager-input
+          path: pager-input/
+          retention-days: 1
+          if-no-files-found: error
+
+  ask:
+    name: Ask Claude for the fix
+    needs: prepare
+    permissions:
+      contents: read
+    # The path that actionlint knows; the syntax $/ is newer than actionlint.
+    uses: ./.github/workflows/ask.yml # zizmor: ignore[self-repository]
+    with:
+      kind: fix
+      # This repository, whose workflows and README every copy has, on its main.
+      repo: ${{ github.repository }}
+      tools: ${{ needs.prepare.outputs.tools }}
+      mode: ${{ needs.prepare.outputs.mode }}
+      turns: ${{ needs.prepare.outputs.turns }}
+      budget: ${{ needs.prepare.outputs.budget }}
+      model: ${{ needs.prepare.outputs.model }}
+      effort: ${{ needs.prepare.outputs.effort }}
+      schema: ${{ needs.prepare.outputs.schema }}
+      prompt: ${{ needs.prepare.outputs.prompt }}
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+  check:
+    name: Check the change of the fix
+    needs: ask
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Get the change of the fix
+        if: needs.ask.outputs.changed == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: pager-fix
+          path: fix
+      - name: Get the transcript of Claude
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: pager-transcript
+          path: transcript
+      # The patch is read as text and never applied: nothing that Claude wrote runs.
+      - name: Check that Claude changed the workflow and the README
+        env:
+          PLAN: ${{ needs.ask.outputs.plan }}
+          CHANGED: ${{ needs.ask.outputs.changed }}
+          PAGER_PATCH: fix/fix.patch
+          PAGER_TRANSCRIPT: transcript
+        run: node pager/job.mjs smoke-fix-check

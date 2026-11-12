@@ -13,6 +13,10 @@
 //   node pager/job.mjs access         check that the token of the workflow reads
 //                                     the log of a job and the discussions of a
 //                                     public repository (smoke.yml)
+//   node pager/job.mjs smoke-fix      collect the task of the smoke test of a fix
+//   node pager/job.mjs smoke-fix-check
+//                                     check that it changed a workflow and a
+//                                     file of its checkout (smoke-fix.yml)
 //
 // Each reads what it needs from the environment of its step and writes its outputs
 // with the workflow commands of GitHub Actions. None of them runs on the machine on
@@ -37,6 +41,7 @@ import { GitHub } from "./github.mjs";
 import { check } from "./health.mjs";
 import { prepare } from "./prepare.mjs";
 import { openPull, workflowsAllowed } from "./pull.mjs";
+import { checkSmokeFix, denialsOf, prepareSmokeFix } from "./smoke.mjs";
 import { reportOf, short, summaryOf, takeTemplate } from "./template.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -115,6 +120,31 @@ const commands = {
     });
   },
 
+  async "smoke-fix"(env) {
+    const outputs = await prepareSmokeFix({
+      out: env.PAGER_INPUT,
+      read: (name) => readFile(join(HERE, name), "utf8"),
+    });
+    await writeOutputs(env.GITHUB_OUTPUT, outputs);
+    return "The smoke test of a fix, with the tools and the mode of a fix.";
+  },
+
+  async "smoke-fix-check"(env) {
+    let patch = "";
+    try {
+      patch = await readFile(env.PAGER_PATCH, "utf8");
+    } catch {
+      // No change, no patch: the check says so.
+    }
+    return checkSmokeFix({
+      plan: env.PLAN ?? "",
+      changed: env.CHANGED === "true",
+      patch,
+      execution: await transcript(env.PAGER_TRANSCRIPT),
+      owner: owner(env),
+    });
+  },
+
   async "pull-request"(env, io) {
     const job = JSON.parse(env.JOB);
     const plan = readPlan(job.kind, env.PLAN, owner(env));
@@ -136,7 +166,14 @@ const commands = {
 
   async answer(env, io) {
     const job = JSON.parse(env.JOB);
-    const { usage, error } = usageOf(await transcript(env.PAGER_TRANSCRIPT));
+    const execution = await transcript(env.PAGER_TRANSCRIPT);
+    const { usage, error } = usageOf(execution);
+    // A write that Claude Code refused is a fix that Claude couldn't make: the run
+    // says which, where the maintainer looks for why nothing changed.
+    const denials = denialsOf(execution);
+    if (denials.length > 0) {
+      io.log(`::warning::Claude Code refused ${denials.join(", ")}.`);
+    }
     const outcome = {
       ask: env.ASK_RESULT,
       plan: env.PLAN ?? "",
@@ -244,7 +281,7 @@ export async function main(command, env, io) {
   const run = commands[command];
   if (run === undefined) {
     io.log(
-      `::error::Unknown command ${command}: prepare, access, pull-request, answer, forward, health or template.`,
+      `::error::Unknown command ${command}: prepare, access, smoke-fix, smoke-fix-check, pull-request, answer, forward, health or template.`,
     );
     return 2;
   }
