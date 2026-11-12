@@ -1,5 +1,9 @@
-# Dependabot keeps the pinned actions current: a pull request per update, which the
-# tests check and the maintainer merges. The repository has no other dependencies.
+# Dependabot keeps every pinned tool current: a pull request per update, which the tests
+# check and the maintainer merges. The actions of the workflows; Biome, in package.json,
+# and Claude Code of the workflow Check the Claude token, in .github/tools/claude-code/,
+# each with its package-lock.json; and the images of actionlint, zizmor and mermaid-cli,
+# in the FROM of a Dockerfile each in .github/tools/, which the workflow Tests and
+# scripts/diagrams.sh read. test/pins.test.mjs fails on a pin that none of these knows.
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -12,4 +16,26 @@ updates:
       prefix: ci
     groups:
       actions:
+        patterns: ["*"]
+  - package-ecosystem: npm
+    directories: ["/", "/.github/tools/claude-code"]
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: ci
+    groups:
+      tools:
+        patterns: ["*"]
+  - package-ecosystem: docker
+    directory: /.github/tools
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: ci
+    groups:
+      images:
         patterns: ["*"]

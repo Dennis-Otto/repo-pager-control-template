@@ -2,7 +2,9 @@ name: Check the Claude token
 
 # Started by hand: proves that the secret CLAUDE_CODE_OAUTH_TOKEN (from `claude setup-token`,
 # the maintainer's subscription, valid for a year) still works. It asks Claude for two words and
-# fails if they don't come back. Each run uses a tiny part of the weekly limit.
+# fails if they don't come back. Each run uses a tiny part of the weekly limit. Claude Code
+# comes from .github/tools/claude-code/, whose package-lock.json pins it with its hash and
+# which Dependabot keeps current.
 
 on:
   workflow_dispatch:
@@ -14,7 +16,17 @@ jobs:
     name: check the token
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    permissions:
+      contents: read
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Install Claude Code
+        run: npm ci --prefix .github/tools/claude-code --no-audit --no-fund
       - name: Ask Claude for two words
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -24,7 +36,7 @@ jobs:
             echo "::error::The secret CLAUDE_CODE_OAUTH_TOKEN is missing."
             exit 1
           fi
-          answer="$(npx --yes @anthropic-ai/claude-code@2.1.317 -p 'Reply with exactly these two words and nothing else: token works' --max-turns 1)"
+          answer="$(.github/tools/claude-code/node_modules/.bin/claude -p 'Reply with exactly these two words and nothing else: token works' --max-turns 1)"
           echo "Claude answered: $answer"
           if [[ "${answer,,}" != *"token works"* ]]; then
             echo "::error::The token didn't get the expected answer."

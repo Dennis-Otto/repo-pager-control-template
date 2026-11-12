@@ -24,8 +24,9 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-# The command line of mermaid with its Chromium, which Renovate keeps current.
-image="minlag/mermaid-cli:12.0.1@sha256:2c5d27365df71da06c288beebe531ea3637cf9b422b871239a3b016233591d24"
+# The command line of mermaid with its Chromium: the FROM of this Dockerfile, which
+# Dependabot keeps current.
+dockerfile=.github/tools/mermaid-cli.Dockerfile
 sources=docs/diagrams
 pictures=docs/images/diagrams
 # The tags of HTML in labels other than <br>, as python3 blueprint.py diagrams extract
@@ -238,7 +239,12 @@ render() {
     echo "Drawing the diagrams needs Docker, which is not installed here; the diagram bot of a pull request draws them too." >&2
     return 1
   fi
-  local work
+  local image work
+  image="$(awk '$1 == "FROM" { print $2; exit }' "$dockerfile")"
+  if [[ -z "$image" ]]; then
+    echo "$dockerfile names no image in a FROM." >&2
+    return 1
+  fi
   work="$(mktemp -d)"
   # The trap runs when the script ends, after the function returned.
   # shellcheck disable=SC2064

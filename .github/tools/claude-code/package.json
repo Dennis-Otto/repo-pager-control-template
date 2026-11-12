@@ -1,0 +1,10 @@
+{
+  "name": "claude-code-for-check-token",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Claude Code for the workflow Check the Claude token, pinned here so that Dependabot keeps it current and npm ci checks its hash.",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/claude-code": "2.1.317"
+  }
+}

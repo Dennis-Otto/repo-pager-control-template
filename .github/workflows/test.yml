@@ -3,7 +3,9 @@ name: Tests
 # The tests of the job scripts with every line, branch and function covered, the
 # lint and format of the code, and the checks of the workflows: actionlint, and
 # zizmor for the ways a workflow gets attacked. The tools run from images pinned by
-# their digest, so that no action of a third party runs here.
+# their digest, so that no action of a third party runs here: each image is the FROM
+# of its Dockerfile in .github/tools/, which Dependabot keeps current, as it keeps
+# Biome current in package.json.
 
 on:
   pull_request:
@@ -32,16 +34,19 @@ jobs:
           node-version-file: .nvmrc
       - name: Tests
         run: npm test
+      - name: Install Biome
+        if: ${{ !cancelled() }}
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Lint and format
         if: ${{ !cancelled() }}
         run: npm run lint
       - name: Lint the workflows
         if: ${{ !cancelled() }}
-        env:
-          ACTIONLINT: rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
-        run: docker run --rm --volume "$PWD:/repo" --workdir /repo "$ACTIONLINT"
+        run: |
+          image="$(awk '$1 == "FROM" { print $2; exit }' .github/tools/actionlint.Dockerfile)"
+          docker run --rm --volume "$PWD:/repo" --workdir /repo "$image"
       - name: Audit the workflows
         if: ${{ !cancelled() }}
-        env:
-          ZIZMOR: ghcr.io/zizmorcore/zizmor:1.31.1@sha256:42d409dbb851d4c5d35a058cf042b828bea1e3f2884378c526eb0974780e18d9
-        run: docker run --rm --volume "$PWD:/repo" --workdir /repo "$ZIZMOR" --offline --format github .github/workflows
+        run: |
+          image="$(awk '$1 == "FROM" { print $2; exit }' .github/tools/zizmor.Dockerfile)"
+          docker run --rm --volume "$PWD:/repo" --workdir /repo "$image" --offline --format github .github/workflows
