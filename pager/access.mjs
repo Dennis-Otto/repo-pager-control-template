@@ -40,6 +40,12 @@ function unfit(repo, lack) {
  * job, or a token that GitHub refuses.
  */
 export async function checkAccess({ api, repo }) {
+  // Only the variable can name something else: say so, not GitHub's 404.
+  if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) {
+    throw new Refusal(
+      `PAGER_SMOKE_REPOSITORY is ${JSON.stringify(repo)}, not owner/name of a public repository`,
+    );
+  }
   const [owner, name] = repo.split("/");
   const runs = await read(`the runs of ${repo}`, () =>
     api.get(`/repos/${repo}/actions/runs?status=success&per_page=1`),

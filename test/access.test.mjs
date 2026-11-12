@@ -81,6 +81,18 @@ describe("the check of the token in the smoke test", () => {
     assert.ok(net.calls.every((call) => !call.url.includes("Dennis-Otto")));
   });
 
+  it("says that PAGER_SMOKE_REPOSITORY is no owner/name, before it asks GitHub", async () => {
+    for (const repo of ["repo-pager", "a/b/c", "a/", "/b", "a b/c"]) {
+      const net = readable(repo);
+      await refusal(
+        net,
+        /^PAGER_SMOKE_REPOSITORY is ".*", not owner\/name of a public repository$/,
+        repo,
+      );
+      assert.equal(net.calls.length, 0);
+    }
+  });
+
   it("says that a repository has no successful run, instead of asking for the jobs of run null", async () => {
     const net = readable().on("GET", `/repos/${SMOKE_REPOSITORY}${RUNS}`, () =>
       json({ total_count: 0, workflow_runs: [] }),
