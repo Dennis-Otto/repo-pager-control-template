@@ -1,5 +1,6 @@
 # Dependabot keeps every pinned tool current: a pull request per update, which the tests
-# check and the maintainer merges. The actions of the workflows; Biome, in package.json,
+# check and which merges by itself once they pass, through the workflow Dependabot in
+# .github/workflows/dependabot.yml. The actions of the workflows; Biome, in package.json,
 # and Claude Code of the workflow Check the Claude token, in .github/tools/claude-code/,
 # each with its package-lock.json; and the images of actionlint, zizmor and mermaid-cli,
 # in the FROM of a Dockerfile each in .github/tools/, which the workflow Tests and
