@@ -821,7 +821,30 @@ describe("the command health-issue", () => {
     );
   });
 
-  it("refuses a result that is neither failure nor success, and passes on an error of the network", async () => {
+  it("only warns on an error of the network after a run that passed, which stays green", async () => {
+    const lines = [];
+    const code = await main(
+      "health-issue",
+      { ...GITHUB, HEALTH_RESULT: "success" },
+      {
+        fetch: () => {
+          throw new TypeError("fetch failed");
+        },
+        log: (line) => lines.push(line),
+      },
+    );
+    assert.equal(code, 0);
+    assert.equal(
+      lines[0],
+      "::warning::The issue of the check stays open: TypeError: fetch failed.",
+    );
+    assert.equal(
+      lines[1],
+      "The pager is well; its issue stays open until the next run.",
+    );
+  });
+
+  it("refuses a result that is neither failure nor success, and passes on an error of the network after a failed run", async () => {
     const refused = await run(new Net(), { HEALTH_RESULT: "cancelled" });
     assert.equal(refused.code, 1);
     assert.match(

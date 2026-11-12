@@ -297,14 +297,18 @@ const commands = {
         owner: owner(env),
       });
     } catch (error) {
-      if (error?.status === undefined) {
+      if (failed && error?.status === undefined) {
         throw error;
       }
-      const why = `${error.message}. The job needs the issues of this repository turned on and issues: write`;
+      const why =
+        error?.status === undefined
+          ? String(error)
+          : `${error.message}. The job needs the issues of this repository turned on and issues: write`;
       if (failed) {
         throw new Refusal(why);
       }
-      // A check that passed stays green; the issue waits for the next run.
+      // A check that passed stays green, whatever went wrong with GitHub,
+      // even its network; the issue waits for the next run.
       io.log(
         annotation("warning", `The issue of the check stays open: ${why}.`),
       );
