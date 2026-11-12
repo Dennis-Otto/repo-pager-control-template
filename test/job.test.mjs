@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
-import { main, writeOutputs } from "../pager/job.mjs";
+import { annotation, main, writeOutputs } from "../pager/job.mjs";
 import { ITEM, json, Net, REPO } from "./fake.mjs";
 
 async function folder() {
@@ -399,6 +399,11 @@ describe("answer", () => {
         tool_use_id: "toolu_1",
         tool_input: { file_path: "repo/.github/workflows/ci.yml" },
       },
+      {
+        tool_name: "Write",
+        tool_use_id: "toolu_2",
+        tool_input: { file_path: "repo/a%0A\n::add-mask::x\r.md" },
+      },
     ];
     await writeFile(
       join(transcript, "claude-execution-output.json"),
@@ -416,9 +421,16 @@ describe("answer", () => {
     });
     assert.equal(code, 0);
     assert.deepEqual(w.lines, [
-      "::warning::Claude Code refused Edit repo/.github/workflows/ci.yml.",
+      "::warning::Claude Code refused Edit repo/.github/workflows/ci.yml, Write repo/a%250A%0A::add-mask::x%0D.md.",
       "The pager answered: noted",
     ]);
+  });
+
+  it("escapes the message of an annotation as @actions/core does", () => {
+    assert.equal(
+      annotation("error", "100% sure\r\n::stop-commands::x"),
+      "::error::100%25 sure%0D%0A::stop-commands::x",
+    );
   });
 
   it("only shows the answer while the pager isn't set up", async () => {

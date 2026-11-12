@@ -73,7 +73,8 @@ jobs:
     uses: ./.github/workflows/ask.yml # zizmor: ignore[self-repository]
     with:
       kind: fix
-      # This repository, whose workflows and README every copy has, on its main.
+      # This repository, whose workflows and README every copy has, at the commit
+      # of the event: in a pull request, its merge commit.
       repo: ${{ github.repository }}
       tools: ${{ needs.prepare.outputs.tools }}
       mode: ${{ needs.prepare.outputs.mode }}

@@ -12,8 +12,8 @@ name: Ask Claude
 #   those that write them, in the checkout alone: it runs no command and reaches no
 #   network. A fix runs in the mode acceptEdits, in which its edits need no yes,
 #   since nobody could give one; Claude Code still refuses a write of its settings,
-#   of git and of the configuration of a tool. It gets the data that the job prepare collected, and the repository
-#   of the job checked out without a token. A translation gets no tool at all, and
+#   of git and of the configuration of a tool. It gets the data that the job
+#   prepare collected, and the repository of the job checked out without a token. A translation gets no tool at all, and
 #   its notes in its prompt, between lines that no note can hold.
 # - The job has the read-only token of the workflow and no secret that writes: the
 #   jobs after it, on other machines, check Claude's answer and post it.
