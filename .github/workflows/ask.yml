@@ -10,8 +10,10 @@ name: Ask Claude
 #   .github/egress-firewall.yaml: Anthropic, and what installs Claude Code.
 # - --restricted and --tools leave Claude the tools that read files, and in a fix
 #   those that write them, in the checkout alone: it runs no command and reaches no
-#   network. It gets the data that the job prepare collected, and the repository
-#   of the job checked out without a token. A translation gets no tool at all, and
+#   network. A fix runs in the mode acceptEdits, in which its edits need no yes,
+#   since nobody could give one; Claude Code still refuses a write of its settings,
+#   of git and of the configuration of a tool. It gets the data that the job
+#   prepare collected, and the repository of the job checked out without a token. A translation gets no tool at all, and
 #   its notes in its prompt, between lines that no note can hold.
 # - The job has the read-only token of the workflow and no secret that writes: the
 #   jobs after it, on other machines, check Claude's answer and post it.
@@ -29,6 +31,10 @@ on:
         default: ""
       tools:
         description: The tools of Claude, or none for no tool at all
+        type: string
+        default: ""
+      mode:
+        description: The permission mode of Claude Code, such as acceptEdits, or none for the default
         type: string
         default: ""
       turns:
@@ -142,10 +148,14 @@ jobs:
           # may name another model for every kind. --tools takes its value after an
           # equals sign: the action reads an empty value after a space as a flag
           # without one, and Claude Code would take the next flag for its tools.
+          # The mode of a fix, acceptEdits, lets Edit and Write change the files of
+          # the checkout: in the default mode each edit waits for a yes, which
+          # --permission-prompts none refuses.
           claude_args: |
             --restricted
             --tools="${{ inputs.tools }}"
             --permission-prompts none
+            ${{ inputs.mode != '' && format('--permission-mode {0}', inputs.mode) || '' }}
             --append-system-prompt-file data/rules.md
             ${{ inputs.turns != '' && format('--max-turns {0}', inputs.turns) || '' }}
             --max-budget-usd ${{ inputs.budget }}

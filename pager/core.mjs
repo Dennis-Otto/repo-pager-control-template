@@ -39,10 +39,19 @@ export const EVENTS = {
  * come in the prompt, and its answer is their lines in the language of the pager.
  * Sonnet at medium effort translates a few lines well. Without a tool, its only
  * turns are the tries of its schema, so it has no limit of turns either.
+ *
+ * The mode, --permission-mode, decides which uses of a tool need a person's yes,
+ * and nobody gives one: --permission-prompts none refuses each. In the default
+ * mode, "" here, reading needs none, but every edit does, so a fix runs in
+ * acceptEdits, which lets Edit and Write change the files of the working
+ * directory without one. Claude Code still asks, and so refuses, a write of its
+ * settings, of git and of the configuration of a tool, such as .npmrc or .husky/.
+ * The fix of 2026-11-06 found its change, and its one edit was refused.
  */
 export const LIMITS = {
   text: {
     tools: "Read,Grep,Glob",
+    mode: "",
     turns: 12,
     budget: "0.50",
     model: "claude-sonnet-5-5",
@@ -50,6 +59,7 @@ export const LIMITS = {
   },
   draft: {
     tools: "Read,Grep,Glob",
+    mode: "",
     turns: 16,
     budget: "1.00",
     model: "claude-opus-5-5",
@@ -57,6 +67,7 @@ export const LIMITS = {
   },
   fix: {
     tools: "Read,Grep,Glob,Edit,Write",
+    mode: "acceptEdits",
     turns: "",
     budget: "3.00",
     model: "claude-opus-5-5",
@@ -64,6 +75,7 @@ export const LIMITS = {
   },
   translate: {
     tools: "",
+    mode: "",
     turns: "",
     budget: "0.30",
     model: "claude-sonnet-5-5",

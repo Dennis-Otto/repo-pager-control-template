@@ -450,6 +450,17 @@ describe("the schemas and the tasks", () => {
     assert.ok(!LIMITS.text.tools.includes("Edit"));
   });
 
+  it("let a fix alone write without a yes, which nobody gives", () => {
+    // In the default mode every edit waits for a yes, and --permission-prompts
+    // none refuses it: the fix of 2026-11-06 changed nothing for that.
+    assert.deepEqual(
+      Object.fromEntries(
+        Object.entries(LIMITS).map(([kind, { mode }]) => [kind, mode]),
+      ),
+      { text: "", draft: "", fix: "acceptEdits", translate: "" },
+    );
+  });
+
   it("set the model and the effort of each kind, as the pager names them", () => {
     assert.deepEqual(
       Object.fromEntries(

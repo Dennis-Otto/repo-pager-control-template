@@ -13,6 +13,10 @@
 //   node pager/job.mjs access         check that the token of the workflow reads
 //                                     the log of a job and the discussions of a
 //                                     public repository (smoke.yml)
+//   node pager/job.mjs smoke-fix      collect the task of the smoke test of a fix
+//   node pager/job.mjs smoke-fix-check
+//                                     check that it changed a workflow and a
+//                                     file of its checkout (smoke-fix.yml)
 //
 // Each reads what it needs from the environment of its step and writes its outputs
 // with the workflow commands of GitHub Actions. None of them runs on the machine on
@@ -37,9 +41,23 @@ import { GitHub } from "./github.mjs";
 import { check } from "./health.mjs";
 import { prepare } from "./prepare.mjs";
 import { openPull, workflowsAllowed } from "./pull.mjs";
+import { checkSmokeFix, denialsOf, prepareSmokeFix } from "./smoke.mjs";
 import { reportOf, short, summaryOf, takeTemplate } from "./template.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+
+/**
+ * A workflow command that annotates the run, its message escaped as @actions/core
+ * escapes it: a line break or a % in data, such as a path that Claude chose, then
+ * stays one annotation and can never start a command of its own.
+ */
+export function annotation(level, message) {
+  const escaped = String(message)
+    .replaceAll("%", "%25")
+    .replaceAll("\r", "%0D")
+    .replaceAll("\n", "%0A");
+  return `::${level}::${escaped}`;
+}
 
 /** Write the outputs of a step, each between delimiters that no value holds. */
 export async function writeOutputs(file, outputs) {
@@ -115,6 +133,31 @@ const commands = {
     });
   },
 
+  async "smoke-fix"(env) {
+    const outputs = await prepareSmokeFix({
+      out: env.PAGER_INPUT,
+      read: (name) => readFile(join(HERE, name), "utf8"),
+    });
+    await writeOutputs(env.GITHUB_OUTPUT, outputs);
+    return "The smoke test of a fix, with the tools and the mode of a fix.";
+  },
+
+  async "smoke-fix-check"(env) {
+    let patch = "";
+    try {
+      patch = await readFile(env.PAGER_PATCH, "utf8");
+    } catch {
+      // No change, no patch: the check says so.
+    }
+    return checkSmokeFix({
+      plan: env.PLAN ?? "",
+      changed: env.CHANGED === "true",
+      patch,
+      execution: await transcript(env.PAGER_TRANSCRIPT),
+      owner: owner(env),
+    });
+  },
+
   async "pull-request"(env, io) {
     const job = JSON.parse(env.JOB);
     const plan = readPlan(job.kind, env.PLAN, owner(env));
@@ -136,7 +179,16 @@ const commands = {
 
   async answer(env, io) {
     const job = JSON.parse(env.JOB);
-    const { usage, error } = usageOf(await transcript(env.PAGER_TRANSCRIPT));
+    const execution = await transcript(env.PAGER_TRANSCRIPT);
+    const { usage, error } = usageOf(execution);
+    // A write that Claude Code refused is a fix that Claude couldn't make: the run
+    // says which, where the maintainer looks for why nothing changed.
+    const denials = denialsOf(execution);
+    if (denials.length > 0) {
+      io.log(
+        annotation("warning", `Claude Code refused ${denials.join(", ")}.`),
+      );
+    }
     const outcome = {
       ask: env.ASK_RESULT,
       plan: env.PLAN ?? "",
@@ -159,7 +211,7 @@ const commands = {
         env.GITHUB_STEP_SUMMARY,
         `### No translation for the pager\n\nThe message of the release keeps its notes in English: ${why}.\n`,
       );
-      io.log(`::warning::No translation for the pager: ${why}.`);
+      io.log(annotation("warning", `No translation for the pager: ${why}.`));
       return "Nothing sent: the message of the release keeps its notes in English.";
     }
     return send(env, io, "The translation for the pager", body);
@@ -184,7 +236,7 @@ const commands = {
     if (problems.length > 0) {
       // One annotation per problem; the last one fails the step.
       for (const problem of problems.slice(0, -1)) {
-        io.log(`::error::${problem}`);
+        io.log(annotation("error", problem));
       }
       throw new Refusal(problems.at(-1));
     }
@@ -233,7 +285,7 @@ const commands = {
     });
     if (!sent.sent) {
       // The pull request is there all the same; the report only points to it.
-      io.log(`::warning::${sent.note}`);
+      io.log(annotation("warning", sent.note));
     }
     return `The pull request ${result.url} takes ${where}. ${sent.note}`;
   },
@@ -244,7 +296,10 @@ export async function main(command, env, io) {
   const run = commands[command];
   if (run === undefined) {
     io.log(
-      `::error::Unknown command ${command}: prepare, access, pull-request, answer, forward, health or template.`,
+      annotation(
+        "error",
+        `Unknown command ${command}: prepare, access, smoke-fix, smoke-fix-check, pull-request, answer, forward, health or template.`,
+      ),
     );
     return 2;
   }
@@ -255,7 +310,7 @@ export async function main(command, env, io) {
     if (!(error instanceof Refusal)) {
       throw error;
     }
-    io.log(`::error::${error.message}`);
+    io.log(annotation("error", error.message));
     return 1;
   }
 }
