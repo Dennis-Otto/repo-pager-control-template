@@ -108,6 +108,38 @@ describe("the delivery to the pager", () => {
     });
   });
 
+  it("tries again after a limit of Cloudflare, for as long as its Retry-After asks", async () => {
+    const answers = [
+      new Response("<!DOCTYPE html>", {
+        status: 429,
+        headers: { "retry-after": "7" },
+      }),
+      new Response("<!DOCTYPE html>", { status: 408 }),
+      new Response("drafted"),
+    ];
+    const net = new Net().on("POST", "/control", () => answers.shift());
+    const result = await send(net);
+    assert.equal(result.sent, true);
+    assert.equal(net.calls.length, 3);
+    assert.deepEqual(result.sleeps, [7000, 4000]);
+  });
+
+  it("names the limit of Cloudflare, not the secret, when every try meets it", async () => {
+    const net = new Net().on(
+      "POST",
+      "/control",
+      () => new Response("<!DOCTYPE html>", { status: 429 }),
+    );
+    const result = await send(net);
+    assert.deepEqual(result, {
+      sent: false,
+      fatal: true,
+      note: "Not sent after 3 tries: the pager answered 429, the rate limit of Cloudflare in front of the Worker.",
+      sleeps: [2000, 4000],
+    });
+    assert.doesNotMatch(result.note, /SECRET/);
+  });
+
   it("waits for real between tries by default", async () => {
     const net = new Net().on(
       "POST",

@@ -144,6 +144,41 @@ describe("the question for the health", () => {
     });
   });
 
+  it("tries again after a limit of Cloudflare, for as long as its Retry-After asks", async () => {
+    const answers = [
+      new Response("<!DOCTYPE html>", {
+        status: 429,
+        headers: { "retry-after": "5" },
+      }),
+      new Response("<!DOCTYPE html>", { status: 408 }),
+      json(well()),
+    ];
+    const net = new Net().on("POST", "/control", () => answers.shift());
+    const waits = [];
+    const answer = await ask(net, undefined, {
+      sleep: async (milliseconds) => {
+        waits.push(milliseconds);
+      },
+    });
+    assert.deepEqual(answer, well());
+    assert.deepEqual(waits, [5000, 4000]);
+  });
+
+  it("names the limit of Cloudflare, not the secret, when every try meets it", async () => {
+    const limited = new Net().on(
+      "POST",
+      "/control",
+      () => new Response("<!DOCTYPE html>", { status: 429 }),
+    );
+    const error = await ask(limited).catch((caught) => caught);
+    assert.equal(
+      error.message,
+      "The pager didn't answer after 3 tries: it answered 429, the rate limit of Cloudflare in front of the Worker.",
+    );
+    assert.doesNotMatch(error.message, /SECRET/);
+    assert.equal(limited.calls.length, 3);
+  });
+
   it("fails on a refusal, an older Worker, an answer that isn't its health and a missing setting", async () => {
     const refused = new Net().on(
       "POST",
@@ -152,9 +187,20 @@ describe("the question for the health", () => {
     );
     await assert.rejects(
       ask(refused),
-      /refused the check with 401: Unauthorized/,
+      /refused the check with 401: Unauthorized\. PAGER_CONTROL_SECRET must equal CONTROL_SECRET of the Worker/,
     );
     assert.equal(refused.calls.length, 1);
+    const forbidden = new Net().on(
+      "POST",
+      "/control",
+      () => new Response("Forbidden", { status: 403 }),
+    );
+    const error = await ask(forbidden).catch((caught) => caught);
+    assert.equal(
+      error.message,
+      "The pager refused the check with 403: Forbidden.",
+    );
+    assert.equal(forbidden.calls.length, 1);
     const older = new Net().on(
       "POST",
       "/control",

@@ -8,8 +8,11 @@ import {
   answerBody,
   LIMITS,
   MAX,
+  MAX_RETRY_AFTER,
+  PASSING,
   PROMPT,
   PROPOSABLE,
+  pause,
   Refusal,
   readJob,
   readPlan,
@@ -1145,6 +1148,52 @@ describe("the body for the pager", () => {
       "x-pager-timestamp": "1700000000",
       "x-pager-signature": `sha256=${expected}`,
     });
+  });
+});
+
+describe("the wait before the next try to reach the pager", () => {
+  const NOW = Date.parse("2026-11-09T16:40:00Z");
+  const after = (value) => new Headers({ "retry-after": value });
+
+  it("takes the 408 and the 429 of Cloudflare for passing", () => {
+    assert.deepEqual(Object.keys(PASSING), ["408", "429"]);
+    assert.match(PASSING[429], /rate limit of Cloudflare/);
+  });
+
+  it("waits as long as Retry-After asks, in seconds or until its date", () => {
+    assert.equal(pause(after("7"), 2000, NOW), 7000);
+    assert.equal(pause(after(" 60 "), 2000, NOW), MAX_RETRY_AFTER);
+    assert.equal(
+      pause(after("Mon, 09 Nov 2026 16:40:30 GMT"), 2000, NOW),
+      30_000,
+    );
+  });
+
+  it("never waits shorter than the back-off of the try", () => {
+    assert.equal(pause(after("0"), 4000, NOW), 4000);
+    assert.equal(
+      pause(after("Mon, 09 Nov 2026 16:39:00 GMT"), 2000, NOW),
+      2000,
+    );
+  });
+
+  it("keeps the back-off without the header, for one that can't be read, and for a wait that would hold the run up", () => {
+    for (const headers of [
+      null,
+      undefined,
+      new Headers(),
+      after("soon"),
+      after("-5"),
+      after("1.5"),
+      after("61"),
+      after("Mon, 09 Nov 2026 17:40:00 GMT"),
+    ]) {
+      assert.equal(
+        pause(headers, 2000, NOW),
+        2000,
+        String(headers?.get("retry-after")),
+      );
+    }
   });
 });
 

@@ -6,7 +6,7 @@
 // PAGER_FIX_TOKEN from GitHub and sends it along, for the reminder of the pager. A
 // failed run reaches the maintainer by GitHub's own notification, which works also when
 // Telegram or the Worker is what broke. No token goes into the log or the summary.
-import { Refusal, signature } from "./core.mjs";
+import { PASSING, pause, Refusal, signature } from "./core.mjs";
 import { GitHub, GitHubError } from "./github.mjs";
 
 const HOUR = 60 * 60 * 1000;
@@ -101,8 +101,24 @@ function isHealth(value) {
 }
 
 /**
+ * Why the pager refused the check, by its status below 500 and the start of its
+ * answer: the secret is named only for a 401, the one status of a wrong signature.
+ */
+function refusal(status, answer) {
+  if (status === 400) {
+    return "The pager doesn't take the body health: deploy a Worker that knows it.";
+  }
+  const hint =
+    status === 401
+      ? " PAGER_CONTROL_SECRET must equal CONTROL_SECRET of the Worker, and the clock of the runner may be off by five minutes at most."
+      : "";
+  return `The pager refused the check with ${status}: ${answer}.${hint}`;
+}
+
+/**
  * Ask the pager for its health, signed, three times at most after a failure of the
- * network or of the Worker. Returns its answer, or throws a refusal that says why
+ * network, of the Worker or a passing one of Cloudflare in front of it, such as its
+ * rate limit, with the wait that a header Retry-After asks for. Returns its answer, or throws a refusal that says why
  * none came.
  */
 export async function askPager({
@@ -123,8 +139,9 @@ export async function askPager({
   const address = `${url.replace(/\/+$/, "")}/control`;
   let last = "";
   for (let attempt = 1; attempt <= tries; attempt += 1) {
+    let response = null;
     try {
-      const response = await fetcher(address, {
+      response = await fetcher(address, {
         method: "POST",
         headers: signature(secret, text, Math.floor(now() / 1000)),
         body: text,
@@ -144,14 +161,13 @@ export async function askPager({
         }
         return health;
       }
-      if (response.status < 500) {
-        throw new Refusal(
-          response.status === 400
-            ? "The pager doesn't take the body health: deploy a Worker that knows it."
-            : `The pager refused the check with ${response.status}: ${answer.slice(0, 200)}. PAGER_CONTROL_SECRET must equal CONTROL_SECRET of the Worker.`,
-        );
+      if (response.status < 500 && !(response.status in PASSING)) {
+        throw new Refusal(refusal(response.status, answer.slice(0, 200)));
       }
-      last = `it answered ${response.status}: ${answer.slice(0, 200)}`;
+      last =
+        response.status in PASSING
+          ? `it answered ${response.status}, ${PASSING[response.status]}`
+          : `it answered ${response.status}: ${answer.slice(0, 200)}`;
     } catch (error) {
       if (error instanceof Refusal) {
         throw error;
@@ -159,7 +175,7 @@ export async function askPager({
       last = `the network failed: ${error.message}`;
     }
     if (attempt < tries) {
-      await sleep(2000 * attempt);
+      await sleep(pause(response?.headers, 2000 * attempt, now()));
     }
   }
   throw new Refusal(`The pager didn't answer after ${tries} tries: ${last}.`);

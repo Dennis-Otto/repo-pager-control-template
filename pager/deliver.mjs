@@ -2,7 +2,7 @@
 // PAGER_CONTROL_SECRET over the time and the body, never to Telegram itself: the
 // Worker alone holds the token of the bot, keeps the state of each thing and shows
 // the answer in its message, escaped, with a button of its allowlist at most.
-import { signature } from "./core.mjs";
+import { PASSING, pause, signature } from "./core.mjs";
 
 /** What each refusal of the pager means, for the log of the run. */
 const REFUSALS = {
@@ -20,8 +20,9 @@ export function wait(milliseconds) {
 }
 
 /**
- * Send a body to the pager, again after a failure of the network or of the Worker,
- * with a new signature each time. Returns whether it arrived, whether a failure
+ * Send a body to the pager, again after a failure of the network, of the Worker or a
+ * passing one of Cloudflare in front of it, such as its rate limit, with a new
+ * signature each time and the wait that a header Retry-After asks for. Returns whether it arrived, whether a failure
  * should fail the run, and what to say in the log.
  */
 export async function deliver({
@@ -44,8 +45,9 @@ export async function deliver({
   const address = `${url.replace(/\/+$/, "")}/control`;
   let last = "";
   for (let attempt = 1; attempt <= tries; attempt += 1) {
+    let response = null;
     try {
-      const response = await fetcher(address, {
+      response = await fetcher(address, {
         method: "POST",
         headers: signature(secret, text, Math.floor(now() / 1000)),
         body: text,
@@ -65,19 +67,22 @@ export async function deliver({
           note: `Not shown: ${REFUSALS[response.status]}.`,
         };
       }
-      if (response.status < 500) {
+      if (response.status < 500 && !(response.status in PASSING)) {
         return {
           sent: false,
           fatal: true,
           note: `Not sent: ${REFUSALS[response.status] ?? `the pager answered ${response.status}: ${answer}`}.`,
         };
       }
-      last = `the pager answered ${response.status}: ${answer}`;
+      last =
+        response.status in PASSING
+          ? `the pager answered ${response.status}, ${PASSING[response.status]}`
+          : `the pager answered ${response.status}: ${answer}`;
     } catch (error) {
       last = `the network failed: ${error.message}`;
     }
     if (attempt < tries) {
-      await sleep(2000 * attempt);
+      await sleep(pause(response?.headers, 2000 * attempt, now()));
     }
   }
   return {
