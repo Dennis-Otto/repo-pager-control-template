@@ -10,6 +10,9 @@
 //                                     fail on what is wrong (health.yml)
 //   node pager/job.mjs template       bring the changes of the template as a pull
 //                                     request, and tell the pager (template.yml)
+//   node pager/job.mjs access         check that the token of the workflow reads
+//                                     the log of a job and the discussions of a
+//                                     public repository (smoke.yml)
 //
 // Each reads what it needs from the environment of its step and writes its outputs
 // with the workflow commands of GitHub Actions. None of them runs on the machine on
@@ -20,6 +23,7 @@ import { appendFile, readdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { checkAccess, SMOKE_REPOSITORY } from "./access.mjs";
 import { relay } from "./agents.mjs";
 import {
   answerBody,
@@ -102,6 +106,13 @@ const commands = {
     });
     await writeOutputs(env.GITHUB_OUTPUT, outputs);
     return `A job of the kind ${outputs.kind}.`;
+  },
+
+  access(env, io) {
+    return checkAccess({
+      api: new GitHub(env.GH_TOKEN, io.fetch),
+      repo: env.PAGER_SMOKE_REPOSITORY || SMOKE_REPOSITORY,
+    });
   },
 
   async "pull-request"(env, io) {
@@ -233,7 +244,7 @@ export async function main(command, env, io) {
   const run = commands[command];
   if (run === undefined) {
     io.log(
-      `::error::Unknown command ${command}: prepare, pull-request, answer, forward, health or template.`,
+      `::error::Unknown command ${command}: prepare, access, pull-request, answer, forward, health or template.`,
     );
     return 2;
   }

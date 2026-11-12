@@ -55,47 +55,16 @@ jobs:
           PAGER_EVENT_PATH: test/fixtures/smoke.json
           PAGER_INPUT: pager-input
         run: node pager/job.mjs prepare
-      # A fix reads the logs of the failed jobs of the public repositories with the
-      # token of the workflow, a token of this repository alone: the newest job of
-      # the pager's own repository shows that GitHub still lets it.
-      - name: Check that the token reads the job logs of a public repository
+      # A fix reads the logs of the failed jobs of the public repositories, and a
+      # draft the thread of a discussion, with the token of the workflow, a token of
+      # this repository alone: a job log and the discussions of a public repository
+      # show that GitHub still lets it. The repository is the pager's own, which
+      # every copy reaches, or the one that the variable PAGER_SMOKE_REPOSITORY names.
+      - name: Check that the token reads the job logs and discussions of a public repository
         env:
           GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository_owner }}/repo-pager
-        run: |
-          set -euo pipefail
-          # A job that ran: a skipped one has no log.
-          run=$(gh api "repos/$REPO/actions/runs?status=success&per_page=1" --jq '.workflow_runs[0].id')
-          job=$(gh api "repos/$REPO/actions/runs/$run/jobs?per_page=100" --jq '[.jobs[] | select(.conclusion == "success")][0].id')
-          # As prepare reads it: the API redirects to the log, and curl sends the
-          # token to the API alone, not to the host of the redirect.
-          status=$(curl --silent --location --output /dev/null --write-out '%{http_code}' \
-            --header "Authorization: Bearer $GH_TOKEN" \
-            --header "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/$REPO/actions/jobs/$job/logs")
-          if [ "$status" != 200 ]; then
-            echo "::error::GitHub answered $status for the log of job $job of $REPO with the token of the workflow, so a fix reads no log: prepare needs a token that can."
-            exit 1
-          fi
-          echo "The token reads the log of job $job of $REPO."
-      # A draft of a discussion reads it through GraphQL with the same token, which
-      # alone has discussions.
-      - name: Check that the token reads the discussions of a public repository
-        env:
-          GH_TOKEN: ${{ github.token }}
-          OWNER: ${{ github.repository_owner }}
-        run: |
-          set -euo pipefail
-          # The variables of GraphQL, which the shell leaves as they are.
-          # shellcheck disable=SC2016
-          query='query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { discussions { totalCount } } }'
-          count=$(gh api graphql -f owner="$OWNER" -f name=repo-pager -f query="$query" \
-            --jq '.data.repository.discussions.totalCount')
-          if ! [[ "$count" =~ ^[0-9]+$ ]]; then
-            echo "::error::The token of the workflow reads no discussions of $OWNER/repo-pager, so a draft of a discussion has no thread: prepare needs a token that can."
-            exit 1
-          fi
-          echo "The token reads the $count discussion(s) of $OWNER/repo-pager."
+          PAGER_SMOKE_REPOSITORY: ${{ vars.PAGER_SMOKE_REPOSITORY }}
+        run: node pager/job.mjs access
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: pager-input
