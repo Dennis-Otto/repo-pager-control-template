@@ -250,10 +250,18 @@ describe("pull-request", () => {
         json({ html_url: `https://github.com/${REPO}/pull/40` }, 201),
       );
     const w = await world(net);
+    // The checkout holds the file in its checked-out form; the commit takes the
+    // blob of the index, which `git cat-file` prints.
     await mkdir(join(w.dir, "repo"));
-    await writeFile(join(w.dir, "repo", "a.txt"), "new");
-    w.io.git = (args) =>
-      args[0] === "apply" ? "" : ":100644 100644 a b M\0a.txt\0";
+    await writeFile(join(w.dir, "repo", "a.txt"), "new\r\n");
+    const commands = [];
+    w.io.git = (args) => {
+      commands.push(args);
+      return Buffer.from(
+        { apply: "", diff: ":100644 100644 a b M\0a.txt\0" }[args[0]] ??
+          "new\n",
+      );
+    };
     const env = {
       ...w.env,
       JOB: JSON.stringify(job),
@@ -273,8 +281,9 @@ describe("pull-request", () => {
     const additions =
       net.to("/graphql")[0].body.variables.input.fileChanges.additions;
     assert.deepEqual(additions, [
-      { path: "a.txt", contents: Buffer.from("new").toString("base64") },
+      { path: "a.txt", contents: Buffer.from("new\n").toString("base64") },
     ]);
+    assert.deepEqual(commands.at(-1), ["cat-file", "blob", ":0:a.txt"]);
   });
 
   it("refuses a change of a workflow, unless PAGER_FIX_WORKFLOWS allows it", async () => {
@@ -289,17 +298,13 @@ describe("pull-request", () => {
           json({ html_url: `https://github.com/${REPO}/pull/41` }, 201),
         );
       const w = await world(net);
-      await mkdir(join(w.dir, "repo", ".github", "workflows"), {
-        recursive: true,
-      });
-      await writeFile(
-        join(w.dir, "repo", ".github", "workflows", "ci.yml"),
-        "on: push",
-      );
       w.io.git = (args) =>
-        args[0] === "apply"
-          ? ""
-          : ":100644 100644 a b M .github/workflows/ci.yml ";
+        Buffer.from(
+          {
+            apply: "",
+            diff: ":100644 100644 a b M .github/workflows/ci.yml ",
+          }[args[0]] ?? "on: push",
+        );
       const env = {
         ...w.env,
         JOB: JSON.stringify(job),

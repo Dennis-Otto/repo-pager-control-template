@@ -8,6 +8,13 @@
 // Those checks run at once, with the secrets of the target repository, before its
 // owner has read the change: a fix therefore doesn't change what the CI runs, its
 // workflows and actions, unless the owner allows it with PAGER_FIX_WORKFLOWS.
+//
+// The commit holds what `git apply --index` wrote into the index, never the files of
+// the checkout: those are in their checked-out form, with CRLF for a path of
+// `text eol=crlf` or smudged by a filter, while the blob holds what the repository
+// keeps.
+
+import { execFileSync } from "node:child_process";
 
 /** The most files and bytes that a fix may change. */
 export const LIMIT = { files: 100, bytes: 5 * 1024 * 1024 };
@@ -15,6 +22,17 @@ export const LIMIT = { files: 100, bytes: 5 * 1024 * 1024 };
 const COMMIT = `mutation($input: CreateCommitOnBranchInput!) {
   createCommitOnBranch(input: $input) { commit { oid } }
 }`;
+
+/**
+ * The git of a checkout: it runs a command there and returns what the command
+ * printed as bytes, so that the content of a blob reaches the commit unchanged.
+ */
+export function gitIn(repo) {
+  return (args) =>
+    execFileSync("git", ["-C", repo, ...args], {
+      maxBuffer: 64 * 1024 * 1024,
+    });
+}
 
 /**
  * The changes of `git diff --cached --raw -z --no-renames`: the status, the new
@@ -91,9 +109,10 @@ function refused(error) {
 }
 
 /**
- * Open the pull request of a fix. Returns its address, or the reason why there is
- * none; it throws only on what isn't a refusal of git or GitHub. A change of what
- * the CI runs is refused unless `workflows` is true.
+ * Open the pull request of a fix, with the `git` of the fresh checkout, which
+ * returns bytes as that of `gitIn` does. Returns its address, or the reason why
+ * there is none; it throws only on what isn't a refusal of git or GitHub. A change
+ * of what the CI runs is refused unless `workflows` is true.
  */
 export async function openPull({
   job,
@@ -104,7 +123,6 @@ export async function openPull({
   patch,
   api,
   git,
-  read,
   workflows = false,
 }) {
   if (token === "") {
@@ -118,7 +136,7 @@ export async function openPull({
     );
   }
   const changes = changesOf(
-    git(["diff", "--cached", "--raw", "-z", "--no-renames"]),
+    String(git(["diff", "--cached", "--raw", "-z", "--no-renames"])),
   );
   if (changes.length === 0) {
     return refused("the change is empty");
@@ -146,7 +164,9 @@ export async function openPull({
       deletions.push({ path: change.path });
       continue;
     }
-    const content = await read(change.path);
+    // The blob at stage 0 of the index; `:0:` before the path has git take all of
+    // it as the path, also one such as `0:x`.
+    const content = git(["cat-file", "blob", `:0:${change.path}`]);
     bytes += content.length;
     additions.push({ path: change.path, contents: content.toString("base64") });
   }

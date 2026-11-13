@@ -23,7 +23,6 @@
 // Each reads what it needs from the environment of its step and writes its outputs
 // with the workflow commands of GitHub Actions. None of them runs on the machine on
 // which Claude ran, so nothing that Claude wrote runs here.
-import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { appendFile, readdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -42,7 +41,7 @@ import { deliver } from "./deliver.mjs";
 import { GitHub } from "./github.mjs";
 import { check, keepIssue, pagerReport, problemsOf } from "./health.mjs";
 import { prepare } from "./prepare.mjs";
-import { openPull, workflowsAllowed } from "./pull.mjs";
+import { gitIn, openPull, workflowsAllowed } from "./pull.mjs";
 import { checkSmokeFix, denialsOf, prepareSmokeFix } from "./smoke.mjs";
 import { reportOf, short, summaryOf, takeTemplate } from "./template.mjs";
 
@@ -186,7 +185,6 @@ const commands = {
       patch: env.PAGER_PATCH,
       api: new GitHub(env.PAGER_FIX_TOKEN, io.fetch),
       git: io.git,
-      read: (path) => readFile(join(env.PAGER_REPO, path)),
       workflows: workflowsAllowed(env.PAGER_FIX_WORKFLOWS),
     });
     await writeOutputs(env.GITHUB_OUTPUT, result);
@@ -408,11 +406,7 @@ export async function main(command, env, io) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   process.exitCode = await main(process.argv[2], process.env, {
     fetch,
-    git: (args) =>
-      execFileSync("git", ["-C", process.env.PAGER_REPO, ...args], {
-        encoding: "utf8",
-        maxBuffer: 64 * 1024 * 1024,
-      }),
+    git: gitIn(process.env.PAGER_REPO),
     sleep: (milliseconds) =>
       new Promise((done) => setTimeout(done, milliseconds)),
     log: (line) => console.log(line),
