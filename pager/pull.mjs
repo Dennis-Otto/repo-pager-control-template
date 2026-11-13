@@ -156,23 +156,27 @@ export async function openPull({
       `the change touches what the CI runs, which a fix doesn't change unless PAGER_FIX_WORKFLOWS allows it: ${ci[0].path}${more}`,
     );
   }
-  const additions = [];
-  const deletions = [];
+  const deletions = changes
+    .filter((change) => change.status === "D")
+    .map((change) => ({ path: change.path }));
+  // The blob at stage 0 of the index; `:0:` before the path has git take all of
+  // it as the path, also one such as `0:x`.
+  const kept = changes
+    .filter((change) => change.status !== "D")
+    .map((change) => `:0:${change.path}`);
+  // The sizes first, so that a blob too large for the buffer of git is refused
+  // before it is read.
   let bytes = 0;
-  for (const change of changes) {
-    if (change.status === "D") {
-      deletions.push({ path: change.path });
-      continue;
+  for (const blob of kept) {
+    bytes += Number(String(git(["cat-file", "-s", blob])).trim());
+    if (bytes > LIMIT.bytes) {
+      return refused("the change is larger than 5 MB");
     }
-    // The blob at stage 0 of the index; `:0:` before the path has git take all of
-    // it as the path, also one such as `0:x`.
-    const content = git(["cat-file", "blob", `:0:${change.path}`]);
-    bytes += content.length;
-    additions.push({ path: change.path, contents: content.toString("base64") });
   }
-  if (bytes > LIMIT.bytes) {
-    return refused("the change is larger than 5 MB");
-  }
+  const additions = kept.map((blob) => ({
+    path: blob.slice(3),
+    contents: git(["cat-file", "blob", blob]).toString("base64"),
+  }));
   const type = /^[a-z]+/.exec(plan.title)[0];
   const branch = `${type}/pager-fix-${runId}`;
   let created = false;

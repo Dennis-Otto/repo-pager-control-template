@@ -257,6 +257,9 @@ describe("pull-request", () => {
     const commands = [];
     w.io.git = (args) => {
       commands.push(args);
+      if (args[1] === "-s") {
+        return Buffer.from("4\n");
+      }
       return Buffer.from(
         { apply: "", diff: ":100644 100644 a b M\0a.txt\0" }[args[0]] ??
           "new\n",

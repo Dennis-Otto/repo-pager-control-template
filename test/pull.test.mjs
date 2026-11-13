@@ -2,7 +2,7 @@
 // through the API, and the pull request; or the reason why there is none.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -72,7 +72,11 @@ function world({
       return Buffer.alloc(0);
     }
     if (args[0] === "cat-file") {
-      return files[args[2].replace(/^:0:/, "")] ?? Buffer.alloc(0);
+      const blob = files[args[2].replace(/^:0:/, "")] ?? Buffer.alloc(0);
+      return args[1] === "-s"
+        ? Buffer.from(`${blob.length}
+`)
+        : blob;
     }
     return Buffer.from(changes);
   };
@@ -105,8 +109,9 @@ describe("the pull request of a fix", () => {
       "--whitespace=nowarn",
       "/tmp/fix/fix.patch",
     ]);
-    assert.deepEqual(w.commands[2], ["cat-file", "blob", ":0:a.txt"]);
-    assert.equal(w.commands.length, 3);
+    assert.deepEqual(w.commands[2], ["cat-file", "-s", ":0:a.txt"]);
+    assert.deepEqual(w.commands[3], ["cat-file", "blob", ":0:a.txt"]);
+    assert.equal(w.commands.length, 4);
     assert.deepEqual(w.net.to("/git/refs")[0].body, {
       ref: "refs/heads/fix/pager-fix-77",
       sha: "b".repeat(40),
@@ -139,11 +144,12 @@ describe("the pull request of a fix", () => {
     assert.equal(w.net.to("/git/refs/heads/fix/pager-fix-77").length, 0);
   });
 
-  it("commits the blobs of the index, not the files of the checkout", async () => {
+  it("commits the blobs of the index, not the files of the checkout", async (t) => {
     // A checkout holds a file in its checked-out form: CRLF for `text eol=crlf`
     // and what a filter's smudge made of it, while the blob, which the commit
     // through the API has to hold, keeps LF and the clean form.
     const dir = await mkdtemp(join(tmpdir(), "pager-pull-"));
+    t.after(() => rm(dir, { recursive: true, force: true }));
     const repo = join(dir, "repo");
     const git = gitIn(repo);
     execFileSync("git", ["init", "-q", repo]);
@@ -233,6 +239,11 @@ describe("the pull request of a fix", () => {
     large.files["a.txt"] = Buffer.alloc(LIMIT.bytes + 1);
     assert.equal((await large.open()).error, "the change is larger than 5 MB");
     assert.equal(large.net.calls.length, 0);
+    // A blob too large for the buffer of git is never read.
+    assert.equal(
+      large.commands.some((args) => args[1] === "blob"),
+      false,
+    );
   });
 
   it("refuses a change of what the CI runs, as long as PAGER_FIX_WORKFLOWS doesn't allow it", async () => {
