@@ -477,12 +477,13 @@ export async function checksOf({ api, repo, number, made }) {
 export async function settle({ api, merger, repo, number, made, sleep }) {
   let checks;
   for (let look = 1; look <= WAIT.looks; look += 1) {
+    // Wait before the first look as well: GitHub registers the runs of a new head
+    // one by one, and a look right away could find only a run that ended at once
+    // (all its jobs skipped) and take the commit for passed before Tests exists.
+    await sleep(WAIT.every);
     checks = await checksOf({ api, repo, number, made });
     if (checks.state !== "pending") {
       break;
-    }
-    if (look < WAIT.looks) {
-      await sleep(WAIT.every);
     }
   }
   if (checks.state === "pending") {

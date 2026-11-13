@@ -733,7 +733,7 @@ describe("the merge of the pull request of the template", () => {
     });
     const { outcome, sleeps } = await ask(net);
     assert.deepEqual(outcome, { state: "merged" });
-    assert.deepEqual(sleeps, []);
+    assert.deepEqual(sleeps, [WAIT.every]);
     const [merge] = net.to("/pulls/8/merge");
     assert.equal(merge.method, "PUT");
     assert.equal(merge.headers.authorization, "Bearer fix");
@@ -765,14 +765,31 @@ describe("the merge of the pull request of the template", () => {
     });
     const { outcome, sleeps } = await ask(net);
     assert.deepEqual(outcome, { state: "merged" });
-    assert.deepEqual(sleeps, [WAIT.every, WAIT.every, WAIT.every]);
+    assert.deepEqual(sleeps, [WAIT.every, WAIT.every, WAIT.every, WAIT.every]);
+  });
+
+  it("takes its first look only after a minute, when GitHub has registered every run of the head", async () => {
+    const net = checking(new Net(), {
+      runs: [[{ name: "Tests", status: "completed", conclusion: "success" }]],
+    });
+    const seen = [];
+    const outcome = await settle({
+      api: new GitHub("read-only", net.fetch),
+      merger: new GitHub("fix", net.fetch),
+      repo: HOME,
+      number: 8,
+      made: MADE,
+      sleep: async () => seen.push(net.calls.length),
+    });
+    assert.deepEqual(outcome, { state: "merged" });
+    assert.deepEqual(seen, [0]);
   });
 
   it("gives up after half an hour of checks that still run", async () => {
     const net = checking(new Net(), { runs: [[running]] });
     const { outcome, sleeps } = await ask(net);
     assert.deepEqual(outcome, { state: "late" });
-    assert.equal(sleeps.length, WAIT.looks - 1);
+    assert.equal(sleeps.length, WAIT.looks);
     assert.equal(WAIT.every * WAIT.looks, 30 * 60_000);
     assert.equal(net.to("/pulls/8/merge").length, 0);
   });
