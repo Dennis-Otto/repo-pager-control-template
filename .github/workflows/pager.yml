@@ -86,6 +86,8 @@ jobs:
           PAGER_FIX_WORKFLOWS: ${{ vars.PAGER_FIX_WORKFLOWS }}
           PAGER_PAUSED: ${{ vars.PAGER_PAUSED }}
           PAGER_DAILY_RUNS: ${{ vars.PAGER_DAILY_RUNS }}
+          PAGER_MODEL: ${{ vars.PAGER_MODEL }}
+          PAGER_LIMITS: ${{ vars.PAGER_LIMITS }}
         run: node pager/job.mjs prepare
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -188,6 +190,7 @@ jobs:
         env:
           JOB: ${{ needs.prepare.outputs.job }}
           PREPARE_ERROR: ${{ needs.prepare.outputs.error }}
+          EFFORT: ${{ needs.prepare.outputs.effort }}
           ASK_RESULT: ${{ needs.ask.result }}
           PLAN: ${{ needs.ask.outputs.plan }}
           CHANGED: ${{ needs.ask.outputs.changed }}

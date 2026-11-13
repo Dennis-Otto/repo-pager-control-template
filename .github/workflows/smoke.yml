@@ -55,6 +55,8 @@ jobs:
           PAGER_EVENT_NAME: workflow_dispatch
           PAGER_EVENT_PATH: test/fixtures/smoke.json
           PAGER_INPUT: pager-input
+          PAGER_MODEL: ${{ vars.PAGER_MODEL }}
+          PAGER_LIMITS: ${{ vars.PAGER_LIMITS }}
         run: node pager/job.mjs prepare
       # A fix reads the logs of the failed jobs of the public repositories, and a
       # draft the thread of a discussion, with the token of the workflow, a token of

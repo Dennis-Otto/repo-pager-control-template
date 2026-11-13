@@ -5,7 +5,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { LIMITS, PROMPT, Refusal, readPlan, schema } from "./core.mjs";
+import { LIMITS, modelOf, PROMPT, Refusal, readPlan, schema } from "./core.mjs";
 
 /**
  * The files that the smoke test changes in its checkout, each with the line that
@@ -54,14 +54,16 @@ function task() {
 /**
  * Collect the data of the smoke test into out, as the job prepare does for a fix:
  * its task and the rules of every job. The outputs name its limits and the schema
- * and prompt of a fix.
+ * and prompt of a fix, with the model of PAGER_MODEL, when set, as every job has it.
  */
-export async function prepareSmokeFix({ out, read }) {
+export async function prepareSmokeFix({ out, read, model = "" }) {
+  const every = modelOf(model);
   await mkdir(out, { recursive: true });
   await writeFile(join(out, "task.md"), task());
   await writeFile(join(out, "rules.md"), await read("rules.md"));
   return {
     ...SMOKE_LIMITS,
+    ...(every === "" ? {} : { model: every }),
     schema: JSON.stringify(schema("fix")),
     prompt: PROMPT,
   };

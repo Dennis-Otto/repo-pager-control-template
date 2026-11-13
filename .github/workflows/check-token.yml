@@ -4,17 +4,27 @@ name: Check the Claude token
 # the maintainer's subscription, valid for a year) still works. It asks Claude for two words and
 # fails if they don't come back. Each run uses a tiny part of the weekly limit. Claude Code
 # comes from .github/tools/claude-code/, whose package-lock.json pins it with its hash and
-# which Dependabot keeps current.
+# which Dependabot keeps current. The workflow Check the set-up (setup.yml) calls it on
+# the runner of the jobs of Claude, which proves that runner as well.
 
 on:
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      runner:
+        description: The runner to ask on, ubuntu-24.04 without it
+        type: string
+    secrets:
+      # Not required, so that a missing token gets the error below.
+      CLAUDE_CODE_OAUTH_TOKEN:
+        required: false
 
 permissions: {}
 
 jobs:
   check:
     name: check the token
-    runs-on: ubuntu-24.04
+    runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 5
     permissions:
       contents: read
@@ -30,6 +40,10 @@ jobs:
       - name: Ask Claude for two words
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # As in ask.yml: on the egress-firewall runner, only Anthropic is reached.
+          DISABLE_TELEMETRY: "1"
+          DISABLE_ERROR_REPORTING: "1"
+          CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
         run: |
           set -euo pipefail
           if [[ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]]; then

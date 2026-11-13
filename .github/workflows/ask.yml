@@ -143,9 +143,10 @@ jobs:
           # The rules come first, as the system prompt; nothing ever prompts, and
           # the run stops at its budget and at its turns, where it has any: the
           # action fails a run whose result counts more turns than --max-turns,
-          # before it reads the answer, so a fix has none. The model and the effort
-          # are those of the kind of job, in LIMITS of pager/core.mjs; PAGER_MODEL
-          # may name another model for every kind. --tools takes its value after an
+          # before it reads the answer, so a fix has none. The model, the effort,
+          # the budget and the turns are those of the kind of job, in LIMITS of
+          # pager/core.mjs, which the job prepare hands on with PAGER_MODEL and
+          # PAGER_LIMITS laid over them, each checked. --tools takes its value after an
           # equals sign: the action reads an empty value after a space as a flag
           # without one, and Claude Code would take the next flag for its tools.
           # The mode of a fix, acceptEdits, lets Edit and Write change the files of
@@ -159,7 +160,7 @@ jobs:
             --append-system-prompt-file data/rules.md
             ${{ inputs.turns != '' && format('--max-turns {0}', inputs.turns) || '' }}
             --max-budget-usd ${{ inputs.budget }}
-            --model ${{ vars.PAGER_MODEL || inputs.model }}
+            --model ${{ inputs.model }}
             --effort ${{ inputs.effort }}
             --json-schema '${{ inputs.schema }}'
       # The transcript of the run, for the answer job, which counts what it took,
