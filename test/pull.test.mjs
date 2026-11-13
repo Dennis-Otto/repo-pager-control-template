@@ -1,12 +1,17 @@
 // The pull request of a fix: the patch on a fresh checkout, one signed commit
 // through the API, and the pull request; or the reason why there is none.
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import { GitHub, GitHubError } from "../pager/github.mjs";
 import {
   changesOf,
   commitMessage,
+  gitIn,
   LIMIT,
   openPull,
   pullBody,
@@ -58,15 +63,23 @@ function world({
       () => new Response(null, { status: 204 }),
     );
   const commands = [];
+  const files = { "a.txt": Buffer.from("new") };
+  // A git that returns bytes, as gitIn does: the blobs of the index from `files`.
   const git = (args) => {
     commands.push(args);
     if (args[0] === "apply") {
       apply?.();
-      return "";
+      return Buffer.alloc(0);
     }
-    return changes;
+    if (args[0] === "cat-file") {
+      const blob = files[args[2].replace(/^:0:/, "")] ?? Buffer.alloc(0);
+      return args[1] === "-s"
+        ? Buffer.from(`${blob.length}
+`)
+        : blob;
+    }
+    return Buffer.from(changes);
   };
-  const files = { "a.txt": Buffer.from("new") };
   const open = (fields = {}) =>
     openPull({
       job,
@@ -77,7 +90,6 @@ function world({
       patch: "/tmp/fix/fix.patch",
       api: new GitHub("github_pat_test", net.fetch),
       git,
-      read: async (path) => files[path] ?? Buffer.alloc(0),
       ...fields,
     });
   return { net, commands, files, open };
@@ -97,6 +109,9 @@ describe("the pull request of a fix", () => {
       "--whitespace=nowarn",
       "/tmp/fix/fix.patch",
     ]);
+    assert.deepEqual(w.commands[2], ["cat-file", "-s", ":0:a.txt"]);
+    assert.deepEqual(w.commands[3], ["cat-file", "blob", ":0:a.txt"]);
+    assert.equal(w.commands.length, 4);
     assert.deepEqual(w.net.to("/git/refs")[0].body, {
       ref: "refs/heads/fix/pager-fix-77",
       sha: "b".repeat(40),
@@ -127,6 +142,57 @@ describe("the pull request of a fix", () => {
     );
     assert.match(pull.body, /🤖 Generated with \[Claude Code\]/);
     assert.equal(w.net.to("/git/refs/heads/fix/pager-fix-77").length, 0);
+  });
+
+  it("commits the blobs of the index, not the files of the checkout", async (t) => {
+    // A checkout holds a file in its checked-out form: CRLF for `text eol=crlf`
+    // and what a filter's smudge made of it, while the blob, which the commit
+    // through the API has to hold, keeps LF and the clean form.
+    const dir = await mkdtemp(join(tmpdir(), "pager-pull-"));
+    t.after(() => rm(dir, { recursive: true, force: true }));
+    const repo = join(dir, "repo");
+    const git = gitIn(repo);
+    execFileSync("git", ["init", "-q", repo]);
+    for (const [key, value] of [
+      ["core.autocrlf", "false"],
+      ["filter.up.smudge", "tr a-z A-Z"],
+      ["filter.up.clean", "tr A-Z a-z"],
+      ["user.name", "monalisa"],
+      ["user.email", "monalisa@example.com"],
+      ["commit.gpgsign", "false"],
+    ]) {
+      git(["config", key, value]);
+    }
+    await writeFile(
+      join(repo, ".gitattributes"),
+      "*.bat text eol=crlf\n*.up filter=up\n",
+    );
+    await writeFile(join(repo, "run.bat"), "echo one\n");
+    await writeFile(join(repo, "notes.up"), "one\n");
+    git(["add", "."]);
+    git(["commit", "-q", "-m", "start"]);
+    await writeFile(join(repo, "run.bat"), "echo one\r\necho two\r\n");
+    await writeFile(join(repo, "notes.up"), "ONE\nTWO\n");
+    const patch = join(dir, "fix.patch");
+    await writeFile(patch, git(["diff", "--binary"]));
+    git(["checkout", "--", "."]);
+    const w = world();
+    assert.deepEqual(await w.open({ git, patch }), {
+      url: `https://github.com/${REPO}/pull/40`,
+      error: "",
+    });
+    const additions = Object.fromEntries(
+      w.net
+        .to("/graphql")[0]
+        .body.variables.input.fileChanges.additions.map((addition) => [
+          addition.path,
+          Buffer.from(addition.contents, "base64").toString(),
+        ]),
+    );
+    assert.deepEqual(additions, {
+      "notes.up": "one\ntwo\n",
+      "run.bat": "echo one\necho two\n",
+    });
   });
 
   it("needs PAGER_FIX_TOKEN", async () => {
@@ -173,6 +239,11 @@ describe("the pull request of a fix", () => {
     large.files["a.txt"] = Buffer.alloc(LIMIT.bytes + 1);
     assert.equal((await large.open()).error, "the change is larger than 5 MB");
     assert.equal(large.net.calls.length, 0);
+    // A blob too large for the buffer of git is never read.
+    assert.equal(
+      large.commands.some((args) => args[1] === "blob"),
+      false,
+    );
   });
 
   it("refuses a change of what the CI runs, as long as PAGER_FIX_WORKFLOWS doesn't allow it", async () => {
