@@ -1,5 +1,12 @@
 {
   "template": "Dennis-Otto/repo-pager-control-template",
   "commit": "",
-  "own": [".github/dependabot.yml", "README.md", "pager/voice.md"]
+  "own": [
+    ".github/dependabot.yml",
+    "README.md",
+    "pager/voice.md",
+    "CONTRIBUTING.md",
+    ".github/ISSUE_TEMPLATE/",
+    ".github/pull_request_template.md"
+  ]
 }

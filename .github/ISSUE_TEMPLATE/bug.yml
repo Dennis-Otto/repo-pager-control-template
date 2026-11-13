@@ -1,0 +1,40 @@
+name: Bug
+description: A job, a workflow or a script of the template does something wrong.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Never paste the log of a run of your control repository**, nor its summary, an answer of the branch `pager-answers` or a secret: your copy is private because its logs show issues, drafts and what Claude read. Describe what happened in your own words. A vulnerability goes to the [private report](https://github.com/Dennis-Otto/repo-pager-control-template/security/advisories/new) of SECURITY.md, never into an issue.
+  - type: input
+    id: workflow
+    attributes:
+      label: Workflow and step
+      description: The workflow and its step that went wrong, such as "Pager, job answer" or "Template".
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, such as the button that you pressed, and what the pager or the run did then. Give the `::error::` line in your own words, without data of your repositories.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should have happened
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Commit of the template
+      description: The `commit` of `.github/template.json` in your copy, the commit of the template that it took last.
+  - type: checkboxes
+    id: private
+    attributes:
+      label: Nothing private
+      options:
+        - label: This issue holds no log of a run of my control repository, no secret and no content of my private repositories.
+          required: true
