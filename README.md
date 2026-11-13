@@ -9,6 +9,14 @@ Repo Pager is self-hosted: everyone who uses it runs an instance of their own, w
   <img src="docs/images/diagrams/how-a-job-runs.svg" alt="How a job of the pager runs: You press Draft a reply or Start fix, or write a text, or a release comes whose notes need your language, and the pager's Worker sends an event to this private repository. The job prepare checks the event and collects what Claude reads, with the read-only token of the workflow. The job ask runs Claude Code with your subscription on the egress-firewall runner; Claude only reads, in a fix edits a checkout, and translates with no tool at all. For a fix with a change, the job pull-request opens a pull request with PAGER_FIX_TOKEN, on another machine. The job answer checks Claude's answer against the allowlist, and a translation against its notes, and sends it to the Worker, signed. The Worker shows it in Telegram: a draft with Send, a note, a proposal with one Confirm button, which acts only when you press it, or the notes of a release in your language.">
 </picture>
 
+## What you need
+
+- **A Claude subscription that includes Claude Code,** and its command line `claude` on your machine, for `claude setup-token`: every job runs with that subscription, never with an API key, and counts against its weekly limit, as [What it costs](#what-it-costs) says.
+- **`gh`, signed in** as the owner of the control repository, for the commands of [Set it up](#set-it-up).
+- **Node 24** only for [`scripts/ask.mjs`](scripts/ask.mjs), with which your own agents ask you; the workflows bring their own Node.
+- **A running Worker and its GitHub App,** steps 1 to 4 of the pager's [set-up](https://github.com/Dennis-Otto/repo-pager/blob/main/docs/setup.md): its step 3 makes `$CONTROL_SECRET` and `$WORKER`, which the commands below take, and the app of its step 4 sends the events here.
+- **GitHub's egress-firewall runner,** `ubuntu-24.04-firewall`, on which the job of Claude runs, so that its network reaches only the hosts of [`.github/egress-firewall.yaml`](.github/egress-firewall.yaml). GitHub offers it as a technical preview, which may change or end, and in an account without it the job *Ask Claude* waits for a runner that never comes. `PAGER_AI_RUNNER` names another runner, such as `ubuntu-24.04`, and gives up that wall: Claude's tools still run no command and reach no network, but nothing besides Claude Code holds the job to the hosts of the list any more.
+
 ## Set it up
 
 The pager's [set-up](https://github.com/Dennis-Otto/repo-pager/blob/main/docs/setup.md) makes your control repository at its start and sets it up in its steps 3, 4 and 7; these are the same steps, for the control repository alone. Name it in a variable of the shell first, your account and a name of your choice:
@@ -17,6 +25,8 @@ The pager's [set-up](https://github.com/Dennis-Otto/repo-pager/blob/main/docs/se
 CONTROL=octocat/repo-pager-control
 gh repo create "$CONTROL" --private --template Dennis-Otto/repo-pager-control-template
 ```
+
+From now on, the daily check *Health* runs in your copy at 06:23 UTC, and until `PAGER_URL` and `PAGER_CONTROL_SECRET` are set below, it fails every day with *The variable PAGER_URL or the secret PAGER_CONTROL_SECRET isn't set, so the pager can't be checked.*, which GitHub mails you, and opens its issue, as the pager's set-up says of its step 7. That is expected: the first run that passes after them closes the issue.
 
 The new repository has every file of the template, in one commit, and no history of it. Delete its `.github/dependabot.yml`: the template's Dependabot keeps the actions and the tools current and the pull request of the workflow *Template* brings them to you, while bumps of your own would only fight it, since that pull request takes each changed file back to the template's pins. The template lists the file in its `own`, so it never comes back:
 
@@ -67,7 +77,22 @@ gh secret set PAGER_FIX_TOKEN -R "$CONTROL"          # paste the fine-grained to
 
 1. **Write your voice:** [`pager/voice.md`](pager/voice.md) says how a draft of a reply in your name reads: your language, your tone and what you never promise. The template's copy is an example; write it in your own words, since it is the one file of a draft that is yours alone, and the workflow *Template* never changes it.
 2. **Try it:** `gh workflow run pager.yml -R "$CONTROL" -f text="What fails on main?"`. Without `PAGER_URL` and `PAGER_CONTROL_SECRET`, the summary of the run shows the answer instead of the chat. The workflow *Check the Claude token* proves that the token of Claude works, for two words of your limit.
-3. **Renew the tokens:** the token of Claude a few weeks before its year ends, as the pager reminds, with `claude setup-token` and `gh secret set CLAUDE_CODE_OAUTH_TOKEN -R "$CONTROL"`, and `PAGER_FIX_TOKEN` the same way, whose day the daily check *Health* reads from GitHub for the pager's reminder.
+3. **Check the health:** `gh workflow run health.yml -R "$CONTROL"` asks the pager for its health at once, and its pass closes the issue that the days before the set-up opened.
+4. **Renew the tokens:** the token of Claude a few weeks before its year ends, as the pager reminds, with `claude setup-token` and `gh secret set CLAUDE_CODE_OAUTH_TOKEN -R "$CONTROL"`, and `PAGER_FIX_TOKEN` the same way, whose day the daily check *Health* reads from GitHub for the pager's reminder.
+
+## When something fails
+
+A 😢 under your text means that the job failed, or that no answer came within an hour; a button that comes back means the same for a draft or a fix. The run of the workflow in the Actions tab of this repository says why: the newest run of *Pager*, *Health* or *Template*, its failed step and the `::error::` in it. These are the failures that the code names, and their fixes:
+
+| What you see | Why | The fix |
+| --- | --- | --- |
+| *Health* fails every day with *The variable PAGER_URL or the secret PAGER_CONTROL_SECRET isn't set* | The set-up isn't done | Set both, as in [Set it up](#set-it-up), and run *Health* by hand: its pass closes its issue |
+| A 😢, or the button back, and no run of *Pager* in the Actions tab at all | Your GitHub App isn't installed on this repository, so the Worker can't send its event here | Add this repository to the installation of your app, as step 4 of the pager's set-up does |
+| The step of Claude in the job *Ask Claude* refuses the actor: *Workflow initiated by non-human actor* | `PAGER_APP` isn't the slug of your app, so the action takes your app for a bot that may not start Claude | Set `PAGER_APP` to the name in the address of your app, `github.com/apps/NAME`: `gh variable set PAGER_APP -R "$CONTROL" --body NAME` |
+| The job *Ask Claude* waits with *Waiting for a runner to pick up this job*, and after an hour the pager gives up | Your account has no egress-firewall runner, or GitHub renamed or ended it | Cancel the run and set `PAGER_AI_RUNNER` to `ubuntu-24.04`, with what [What you need](#what-you-need) says that it gives up |
+| The job `answer` or *Health* fails with a 401 of `/control`: *the pager refused the signature* | `PAGER_CONTROL_SECRET` here and `CONTROL_SECRET` of the Worker differ | Set both to the same text again, as step 3 of the pager's set-up does |
+| A fix says *No pull request:* and GitHub's refusal, such as *Resource not accessible by personal access token* or *Not Found* | `PAGER_FIX_TOKEN` doesn't name the target repository, or lacks *Contents* or *Pull requests*; or, for a change of the CI that `PAGER_FIX_WORKFLOWS` allows, *Workflows* | Add the repository or the permission to the token in [your fine-grained tokens](https://github.com/settings/personal-access-tokens); an edit keeps its value, so the secret stays as it is. *PAGER_FIX_TOKEN isn't set* needs `gh secret set PAGER_FIX_TOKEN -R "$CONTROL"` |
+| A run of *Template* fails, and its summary lists what waits | `PAGER_FIX_TOKEN` isn't set, doesn't name this repository or lacks *Workflows* | Give the token this repository, with *Contents*, *Pull requests* and *Workflows*, and run it again: `gh workflow run template.yml -R "$CONTROL"` |
 
 ## What runs here
 
