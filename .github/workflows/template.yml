@@ -16,7 +16,9 @@ name: Template
 
 on:
   schedule:
-    - cron: "41 5 * * 1"
+    # Late in the morning of UTC and off the full hour, as Health: GitHub starts a
+    # scheduled run late, by hours at times, when many are due.
+    - cron: "17 11 * * 1"
   workflow_dispatch:
 
 permissions: {}

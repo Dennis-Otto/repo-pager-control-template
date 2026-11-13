@@ -368,6 +368,35 @@ describe("the pull request of a fix", () => {
     assert.ok(new GitHubError(1, "x").status === 1);
   });
 
+  it("takes its branch back before it lets such an error through", async () => {
+    const w = world();
+    w.net.on("POST", "/graphql", () => {
+      throw new TypeError("fetch failed");
+    });
+    await assert.rejects(w.open(), {
+      name: "TypeError",
+      message: "fetch failed",
+    });
+    assert.equal(
+      w.net.to("/git/refs/heads/fix/pager-fix-77")[0].method,
+      "DELETE",
+    );
+    // A branch that can't go doesn't hide the error that came first.
+    const stuck = world();
+    stuck.net
+      .on("POST", "/pulls", () => {
+        throw new TypeError("fetch failed");
+      })
+      .on("DELETE", /\/git\/refs\/heads\//, () => {
+        throw new TypeError("network");
+      });
+    await assert.rejects(stuck.open(), { message: "fetch failed" });
+    assert.equal(
+      stuck.net.calls.filter((call) => call.method === "DELETE").length,
+      1,
+    );
+  });
+
   it("reads the raw diff of git, and writes the trailers", () => {
     assert.deepEqual(changesOf(raw(["M", "100755", "run.sh"])), [
       { status: "M", mode: "100755", path: "run.sh" },

@@ -205,14 +205,15 @@ export async function openPull({
     });
     return { url: pull.html_url, error: "" };
   } catch (error) {
-    if (error?.status === undefined) {
-      throw error;
-    }
     if (created) {
-      // A branch without its pull request helps nobody; one that can't go stays.
+      // A branch without its pull request helps nobody, also when the error isn't
+      // GitHub's, such as a fetch that failed; one that can't go stays.
       await api
         .request("DELETE", `/repos/${job.repo}/git/refs/heads/${branch}`)
         .catch(() => undefined);
+    }
+    if (error?.status === undefined) {
+      throw error;
     }
     return refused(error.message);
   }
