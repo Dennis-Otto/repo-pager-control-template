@@ -5,7 +5,10 @@ name: Tests
 # zizmor for the ways a workflow gets attacked. The tools run from images pinned by
 # their digest, so that no action of a third party runs here: each image is the FROM
 # of its Dockerfile in .github/tools/, which Dependabot keeps current, as it keeps
-# Biome current in package.json.
+# Biome current in package.json. The diagrams are checked without Docker: no
+# ```mermaid block in the Markdown, both pictures of every source that a page shows
+# and a source for every picture. It doesn't see a picture that is older than its
+# source, so draw the pictures anew after a change of one: bash scripts/diagrams.sh.
 
 on:
   pull_request:
@@ -34,6 +37,9 @@ jobs:
           node-version-file: .nvmrc
       - name: Tests
         run: npm test
+      - name: Check the diagrams
+        if: ${{ !cancelled() }}
+        run: npm run diagrams
       - name: Install Biome
         if: ${{ !cancelled() }}
         run: npm ci --ignore-scripts --no-audit --no-fund
