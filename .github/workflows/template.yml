@@ -6,8 +6,13 @@ name: Template
 # with a report. The files that `own` there lists, such as the README and the voice
 # of the drafts, stay as they are. Without PAGER_FIX_TOKEN, or when GitHub refuses
 # it, the run fails and its summary lists what waits, so that GitHub tells the
-# owner. The template itself takes nothing. No Claude runs here, and it takes about
-# a minute of Actions a week. README.md describes the way.
+# owner. With "merge": true in .github/template.json, the run then waits up to half
+# an hour for the checks of its commit, which it reads with its own token, and
+# merges the pull request with PAGER_FIX_TOKEN once every one passed and its head is
+# still the commit that it made; the report says what was merged, or what failed.
+# The template itself takes nothing. No Claude runs here, and it takes about a
+# minute of Actions a week, and the minutes of the checks with "merge". README.md
+# describes the way.
 
 on:
   schedule:
@@ -24,9 +29,14 @@ jobs:
   take:
     name: Take the changes of the template
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 40
     permissions:
       contents: read
+      # For "merge" alone: the runs and checks of the commit of the pull request,
+      # read with this token, so that PAGER_FIX_TOKEN needs no more permissions.
+      actions: read
+      checks: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -34,7 +44,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
-      - name: Bring the changes of the template as a pull request
+      - name: Bring the changes of the template as a pull request, and merge it when asked
         env:
           GITHUB_TOKEN: ${{ github.token }}
           PAGER_FIX_TOKEN: ${{ secrets.PAGER_FIX_TOKEN }}

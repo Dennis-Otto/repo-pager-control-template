@@ -3,8 +3,9 @@
 // run, each pinned to a commit (the Actions policy of selected actions with required SHA
 // pinning), every job gets contents: read at most, and the three exceptions: the
 // workflow Dependabot merges only a pull request of Dependabot, in the template alone,
-// the workflow Health keeps one issue of a failed check, and the job prepare of the
-// workflow Pager reads today's runs of its own workflow for PAGER_DAILY_RUNS.
+// the workflow Health keeps one issue of a failed check, the job prepare of the
+// workflow Pager reads today's runs of its own workflow for PAGER_DAILY_RUNS, and the
+// workflow Template reads the checks of its pull request for `merge`.
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -12,6 +13,7 @@ import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { BY_ITSELF } from "../pager/prepare.mjs";
+import { WAIT } from "../pager/template.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const WORKFLOWS = ".github/workflows";
@@ -24,6 +26,14 @@ const HEALTH_PERMISSIONS = ["contents: read", "issues: write"];
 // The workflow whose job prepare counts its runs of today, and what it may read.
 const PAGER = "pager.yml";
 const PAGER_PERMISSIONS = ["contents: read", "actions: read"];
+// The workflow whose pull request merges by itself, and what it may read for that.
+const TEMPLATE = "template.yml";
+const TEMPLATE_PERMISSIONS = [
+  "contents: read",
+  "actions: read",
+  "checks: read",
+  "pull-requests: read",
+];
 // The actions that the Actions policy of the template allows besides GitHub's own.
 const ALLOWED = ["anthropics/claude-code-action"];
 
@@ -83,6 +93,7 @@ describe("the workflows of the template", {
         [MERGE]: MERGE_PERMISSIONS,
         [HEALTH]: HEALTH_PERMISSIONS,
         [PAGER]: PAGER_PERMISSIONS,
+        [TEMPLATE]: TEMPLATE_PERMISSIONS,
       }[name] ?? ["contents: read"];
       assert.deepEqual(
         granted.filter((line) => !allowed.includes(line)),
@@ -188,5 +199,27 @@ describe("the workflow Pager", () => {
       prepare,
       /^ {10}PAGER_DAILY_RUNS: \$\{\{ vars\.PAGER_DAILY_RUNS \}\}$/m,
     );
+  });
+});
+
+describe("the workflow Template", () => {
+  const text = read(`${WORKFLOWS}/${TEMPLATE}`);
+
+  it("waits for the checks within its own run, on no trigger that a pull request starts", () => {
+    assert.doesNotMatch(text, /workflow_run|pull_request/);
+    const minutes = Number(text.match(/^ {4}timeout-minutes: (\d+)$/m)[1]);
+    assert.ok(
+      minutes * 60_000 > WAIT.every * WAIT.looks + 5 * 60_000,
+      "the job ends before its wait for the checks",
+    );
+  });
+
+  it("reads the checks with the token of the workflow and merges with PAGER_FIX_TOKEN", () => {
+    assert.match(text, /^ {10}GITHUB_TOKEN: \$\{\{ github\.token \}\}$/m);
+    assert.match(
+      text,
+      /^ {10}PAGER_FIX_TOKEN: \$\{\{ secrets\.PAGER_FIX_TOKEN \}\}$/m,
+    );
+    assert.doesNotMatch(text, /: write$/m);
   });
 });

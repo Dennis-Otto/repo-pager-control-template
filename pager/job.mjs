@@ -11,7 +11,9 @@
 //   node pager/job.mjs health-issue   open or comment on the issue of a failed
 //                                     check, or close it after one that passed
 //   node pager/job.mjs template       bring the changes of the template as a pull
-//                                     request, and tell the pager (template.yml)
+//                                     request, merge it once its checks pass when
+//                                     the settings ask, and tell the pager
+//                                     (template.yml)
 //   node pager/job.mjs access         check that the token of the workflow reads
 //                                     the log of a job and the discussions of a
 //                                     public repository (smoke.yml)
@@ -43,7 +45,13 @@ import { check, keepIssue, pagerReport, problemsOf } from "./health.mjs";
 import { prepare } from "./prepare.mjs";
 import { gitIn, openPull, workflowsAllowed } from "./pull.mjs";
 import { checkSmokeFix, denialsOf, prepareSmokeFix } from "./smoke.mjs";
-import { reportOf, short, summaryOf, takeTemplate } from "./template.mjs";
+import {
+  reportOf,
+  settle,
+  short,
+  summaryOf,
+  takeTemplate,
+} from "./template.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -347,6 +355,26 @@ const commands = {
       );
     }
     await appendFile(env.GITHUB_STEP_SUMMARY, summaryOf(result));
+    let outcome;
+    if (result.merge && result.number !== undefined) {
+      try {
+        outcome = await settle({
+          api: new GitHub(env.GITHUB_TOKEN, io.fetch),
+          merger: api,
+          repo: env.GITHUB_REPOSITORY,
+          number: result.number,
+          made: result.made,
+          sleep: io.sleep,
+        });
+      } catch (error) {
+        if (error?.status === undefined) {
+          throw error;
+        }
+        throw new Refusal(
+          `${error.message}. The job reads the checks of the pull request ${result.url} with the token of the workflow, which needs actions: read, checks: read and pull-requests: read, and merges it with PAGER_FIX_TOKEN`,
+        );
+      }
+    }
     if (result.state === "template") {
       return "This is the template itself: it takes nothing.";
     }
@@ -359,13 +387,21 @@ const commands = {
         `${where} has changes for this repository, which the summary lists: give PAGER_FIX_TOKEN this repository, with Contents, Pull requests and Workflows read and write, and they come as a pull request`,
       );
     }
-    if (result.state === "open") {
-      return `The pull request ${result.url} takes ${where} already.`;
+    const settled =
+      outcome === undefined ? "" : ` ${SETTLED[outcome.state](outcome)}`;
+    // A pull request that waits from an earlier run told the pager then; only its
+    // merge is news. One that closed while its checks ran needs no one either.
+    if (
+      (result.state === "open" && outcome?.state !== "merged") ||
+      outcome?.state === "closed"
+    ) {
+      const already = result.state === "open" ? " already" : "";
+      return `The pull request ${result.url} takes ${where}${already}.${settled}`;
     }
     const sent = await deliver({
       url: env.PAGER_URL ?? "",
       secret: env.PAGER_CONTROL_SECRET ?? "",
-      body: reportOf(result, env.PAGER_LANGUAGE),
+      body: reportOf(result, env.PAGER_LANGUAGE, outcome),
       fetcher: io.fetch,
       sleep: io.sleep,
     });
@@ -373,8 +409,20 @@ const commands = {
       // The pull request is there all the same; the report only points to it.
       io.log(annotation("warning", sent.note));
     }
-    return `The pull request ${result.url} takes ${where}. ${sent.note}`;
+    return `The pull request ${result.url} takes ${where}.${settled} ${sent.note}`;
   },
+};
+
+/** What became of the pull request of the template after its checks, for the log. */
+const SETTLED = {
+  merged: () => "It passed every check and is merged.",
+  failed: ({ failed }) => `It waits for a person: ${failed.join(", ")} failed.`,
+  moved: () =>
+    "It waits for a person: its head is a commit that this workflow didn't make.",
+  late: () => "It waits for a person: its checks still ran after half an hour.",
+  refused: ({ why }) =>
+    `It waits for a person: GitHub didn't merge it: ${why}.`,
+  closed: () => "It was closed or merged while its checks ran.",
 };
 
 /** Run a command; a refusal fails the step with its reason as an annotation. */

@@ -1,0 +1,29 @@
+name: Proposal
+description: A change that every control repository needs, such as a new job or a better check.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A change that only your own copy needs belongs in that copy, in a file of its `own`. A change of the Worker or of the chat belongs to [Repo Pager](https://github.com/Dennis-Otto/repo-pager/issues). **Never paste the log of a run of your control repository** or a secret here: your copy is private because its logs show issues, drafts and what Claude read.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would it solve?
+      description: What you do today, and what that costs you.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What do you suggest?
+      description: The change, and what it means for the owners of the other copies, such as a new secret, a permission or minutes of Actions.
+    validations:
+      required: true
+  - type: checkboxes
+    id: private
+    attributes:
+      label: Nothing private
+      options:
+        - label: This issue holds no log of a run of my control repository, no secret and no content of my private repositories.
+          required: true

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: A vulnerability
+    url: https://github.com/Dennis-Otto/repo-pager-control-template/security/advisories/new
+    about: Report it privately, as SECURITY.md says, never in an issue.
+  - name: The Worker, the chat or the set-up
+    url: https://github.com/Dennis-Otto/repo-pager/issues
+    about: Repo Pager itself, its Telegram bot, its Worker on Cloudflare and its guide.
