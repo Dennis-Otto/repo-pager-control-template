@@ -24,7 +24,13 @@ The new repository has every file of the template, in one commit, and no history
 gh api -X DELETE "repos/$CONTROL/contents/.github/dependabot.yml"   -f message="chore: the template keeps the actions and the tools current"   -f sha="$(gh api "repos/$CONTROL/contents/.github/dependabot.yml" --jq .sha)"
 ```
 
-A copy takes the files of the template, not its settings. Let GitHub enforce what the template promises under [Safety](#safety): only GitHub's own actions and `anthropics/claude-code-action` run, each pinned to a commit. GitHub then refuses a run of any other action, or of one pinned to a tag, before it starts; a workflow of your own that needs another action adds it to the list:
+A copy takes the files of the template, not its settings, and GitHub starts it with its defaults: a pull request may be merged with a merge commit or a rebase, and its branch stays after the merge. Allow the squash alone, titled as the pull request, and have GitHub delete the branch of a merged pull request, so that one wrong choice in the merge button can't turn the pull request of the workflow *Template* into a merge commit, and the branches of merged pull requests don't pile up beside `template-sync` and `pager-answers`, which the workflows use. A private repository on GitHub Free has no rulesets, so these settings are what holds the squash there. *Template* makes `template-sync` again when it needs it:
+
+```sh
+gh api -X PATCH "repos/$CONTROL"   -F allow_squash_merge=true -F allow_merge_commit=false -F allow_rebase_merge=false   -F delete_branch_on_merge=true -f squash_merge_commit_title=PR_TITLE -f squash_merge_commit_message=PR_BODY
+```
+
+Let GitHub enforce as well what the template promises under [Safety](#safety): only GitHub's own actions and `anthropics/claude-code-action` run, each pinned to a commit. GitHub then refuses a run of any other action, or of one pinned to a tag, before it starts; a workflow of your own that needs another action adds it to the list:
 
 ```sh
 gh api -X PUT "repos/$CONTROL/actions/permissions"   -F enabled=true -f allowed_actions=selected -F sha_pinning_required=true
