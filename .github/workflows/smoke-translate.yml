@@ -75,6 +75,8 @@ jobs:
           PAGER_EVENT_NAME: repository_dispatch
           PAGER_EVENT_PATH: ${{ runner.temp }}/event.json
           PAGER_INPUT: pager-input
+          PAGER_MODEL: ${{ vars.PAGER_MODEL }}
+          PAGER_LIMITS: ${{ vars.PAGER_LIMITS }}
         run: node pager/job.mjs prepare
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
+import { LIMITS } from "../pager/core.mjs";
 import { GitHub, GitHubError } from "../pager/github.mjs";
 import {
   BY_ITSELF,
@@ -1337,6 +1338,84 @@ describe("a job that the owner holds", () => {
     });
     await assert.rejects(
       held({ kind: "translate" }, api(broken), hold({ daily: "3" })),
+      TypeError,
+    );
+  });
+
+  async function prepareTuned(net, event, tuning, extra = {}) {
+    const out = await mkdtemp(join(tmpdir(), "pager-"));
+    return prepare({
+      eventName: "repository_dispatch",
+      event,
+      owner: OWNER,
+      api: api(net),
+      out,
+      read,
+      hold: hold(extra),
+      tuning,
+    });
+  }
+
+  it("hands on the limits of the kind with PAGER_MODEL and PAGER_LIMITS laid over them", async () => {
+    const tuning = {
+      model: "claude-sonnet-5-5",
+      limits: '{"translate": {"model": "claude-haiku-5-5", "budget": "0.10"}}',
+    };
+    const { outputs, settings } = await prepareTuned(
+      new Net(),
+      EVENTS.translate,
+      tuning,
+    );
+    assert.equal(settings, "");
+    assert.equal(outputs.error, "");
+    assert.deepEqual(
+      [outputs.model, outputs.budget, outputs.effort, outputs.tools],
+      ["claude-haiku-5-5", "0.10", "medium", ""],
+    );
+    // PAGER_MODEL alone is the model of every kind, as before.
+    const fix = await prepareTuned(new Net(), EVENTS.fix, {
+      model: "claude-sonnet-5-5",
+    });
+    assert.deepEqual(
+      [fix.outputs.model, fix.outputs.budget, fix.outputs.tools],
+      ["claude-sonnet-5-5", "3.00", "Read,Grep,Glob,Edit,Write"],
+    );
+  });
+
+  it("holds every job while PAGER_LIMITS doesn't check out, and names it", async () => {
+    for (const event of Object.values(EVENTS)) {
+      const net = new Net();
+      const out = await mkdtemp(join(tmpdir(), "pager-"));
+      const { outputs, settings } = await prepare({
+        eventName: "repository_dispatch",
+        event,
+        owner: OWNER,
+        api: api(net),
+        out,
+        read,
+        hold: hold({ paused: true }),
+        tuning: { limits: '{"fix": {"tools": "Bash"}}' },
+      });
+      assert.match(settings, /^PAGER_LIMITS can't set tools of fix/);
+      // The setting comes first: it holds a job that nothing else holds.
+      assert.equal(outputs.error, settings);
+      assert.equal(net.calls.length, 0, event.action);
+      assert.deepEqual((await readdir(out, { recursive: true })).sort(), [
+        "logs",
+        "rules.md",
+        "task.md",
+      ]);
+      // Its limits are the template's, though no Claude runs with them.
+      const kind = JSON.parse(outputs.job).kind;
+      assert.equal(outputs.tools, LIMITS[kind].tools);
+    }
+    const model = await prepareTuned(new Net(), EVENTS.fix, { model: "a b" });
+    assert.match(model.outputs.error, /^PAGER_MODEL isn't the id of a model/);
+  });
+
+  it("lets an error that isn't a refusal of the settings through", async () => {
+    await assert.rejects(
+      prepareTuned(new Net(), EVENTS.fix, { model: 5 }),
       TypeError,
     );
   });

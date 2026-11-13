@@ -200,6 +200,35 @@ describe("the workflow Pager", () => {
       /^ {10}PAGER_DAILY_RUNS: \$\{\{ vars\.PAGER_DAILY_RUNS \}\}$/m,
     );
   });
+
+  it("checks PAGER_MODEL and PAGER_LIMITS in the job prepare, whose limits alone reach Claude", () => {
+    for (const name of [PAGER, "smoke.yml", "smoke-translate.yml"]) {
+      const workflow = read(`${WORKFLOWS}/${name}`);
+      for (const variable of ["PAGER_MODEL", "PAGER_LIMITS"]) {
+        assert.match(
+          workflow,
+          new RegExp(
+            `^ {10}${variable}: \\$\\{\\{ vars\\.${variable} \\}\\}$`,
+            "m",
+          ),
+          `${name} ${variable}`,
+        );
+      }
+    }
+    assert.match(
+      read(`${WORKFLOWS}/smoke-fix.yml`),
+      /^ {10}PAGER_MODEL: \$\{\{ vars\.PAGER_MODEL \}\}$/m,
+    );
+    // ask.yml takes the model that prepare checked, never the variable itself.
+    const ask = read(`${WORKFLOWS}/ask.yml`);
+    assert.match(ask, /^ {12}--model \$\{\{ inputs\.model \}\}$/m);
+    assert.doesNotMatch(ask, /PAGER_MODEL \|\||vars\.PAGER_LIMITS/);
+    // The footer names the effort that the run had.
+    assert.match(
+      text,
+      /^ {10}EFFORT: \$\{\{ needs\.prepare\.outputs\.effort \}\}$/m,
+    );
+  });
 });
 
 describe("the workflow Template", () => {
@@ -221,5 +250,52 @@ describe("the workflow Template", () => {
       /^ {10}PAGER_FIX_TOKEN: \$\{\{ secrets\.PAGER_FIX_TOKEN \}\}$/m,
     );
     assert.doesNotMatch(text, /: write$/m);
+  });
+});
+
+describe("the workflow Check the set-up", () => {
+  const text = read(`${WORKFLOWS}/setup.yml`);
+  const setup = text.slice(text.indexOf("  setup:"), text.indexOf("  claude:"));
+  const claude = text.slice(text.indexOf("  claude:"));
+
+  it("gives the check no token of Claude, only whether it is set", () => {
+    assert.match(
+      setup,
+      /^ {10}CLAUDE_TOKEN_SET: \$\{\{ secrets\.CLAUDE_CODE_OAUTH_TOKEN != '' \}\}$/m,
+    );
+    assert.equal(setup.match(/CLAUDE_CODE_OAUTH_TOKEN/g).length, 1);
+    assert.match(setup, /^ {8}run: node pager\/job\.mjs doctor$/m);
+  });
+
+  it("asks Claude for two words on the runner of the jobs of Claude, after the check", () => {
+    assert.match(claude, /^ {4}needs: setup$/m);
+    assert.match(
+      claude,
+      /^ {4}uses: \.\/\.github\/workflows\/check-token\.yml /m,
+    );
+    const runner = read(`${WORKFLOWS}/ask.yml`).match(
+      /^ {4}runs-on: \$\{\{ (.+) \}\}$/m,
+    )[1];
+    assert.match(
+      claude,
+      new RegExp(
+        `^ {6}runner: $\{{ ${runner.replace(/[.|()]/g, "$&")} }}$`,
+        "m",
+      ),
+    );
+    // By hand, Check the Claude token keeps its runner of every day.
+    assert.match(
+      read(`${WORKFLOWS}/check-token.yml`),
+      /^ {4}runs-on: \$\{\{ inputs\.runner \|\| 'ubuntu-24\.04' \}\}$/m,
+    );
+  });
+
+  it("skips the template, which has no set-up", () => {
+    for (const job of [setup, claude]) {
+      assert.match(
+        job,
+        /github\.repository != 'Dennis-Otto\/repo-pager-control-template'/,
+      );
+    }
   });
 });

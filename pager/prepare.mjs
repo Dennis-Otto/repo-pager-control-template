@@ -6,7 +6,15 @@ import { randomBytes } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { LIMITS, PROMPT, readJob, schema, task } from "./core.mjs";
+import {
+  LIMITS,
+  limitsOf,
+  PROMPT,
+  Refusal,
+  readJob,
+  schema,
+  task,
+} from "./core.mjs";
 import { GitHubError } from "./github.mjs";
 
 /**
@@ -759,7 +767,10 @@ async function collect(job, { api, owner, read }) {
  * Prepare a job: check its event, collect its data into out and return the job and
  * the outputs of the step, which name the limits and the schema of its kind. With
  * hold, the job keeps PAGER_PAUSED and PAGER_DAILY_RUNS: a job that they hold
- * collects nothing, and its error says why.
+ * collects nothing, and its error says why. Tuning holds PAGER_MODEL and
+ * PAGER_LIMITS, as limitsOf of pager/core.mjs reads them: one that doesn't check
+ * out holds the job in the same way, and `settings` of the result names it, for an
+ * error of the run as well.
  */
 export async function prepare({
   eventName,
@@ -770,9 +781,23 @@ export async function prepare({
   read,
   workflows = false,
   hold,
+  tuning = {},
 }) {
   const job = readJob(eventName, event, owner);
-  const why = hold === undefined ? "" : await held(job, api, hold);
+  let limits = LIMITS;
+  let settings = "";
+  try {
+    limits = limitsOf(tuning);
+  } catch (refusal) {
+    if (!(refusal instanceof Refusal)) {
+      throw refusal;
+    }
+    settings = refusal.message;
+  }
+  let why = settings;
+  if (why === "" && hold !== undefined) {
+    why = await held(job, api, hold);
+  }
   const { files, error } =
     why === ""
       ? await collect(job, { api, owner, read })
@@ -796,11 +821,12 @@ export async function prepare({
   const translates = job.kind === "translate";
   return {
     job,
+    settings,
     outputs: {
       job: JSON.stringify(named),
       kind: job.kind,
       repo: translates ? "" : (job.repo ?? ""),
-      ...LIMITS[job.kind],
+      ...limits[job.kind],
       schema: JSON.stringify(schema(job.kind, job.lines?.length)),
       prompt: translates ? files["task.md"] : PROMPT,
       error,

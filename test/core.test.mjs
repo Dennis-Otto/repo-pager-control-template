@@ -6,9 +6,13 @@ import { describe, it } from "node:test";
 
 import {
   answerBody,
+  EFFORTS,
   LIMITS,
+  limitsOf,
   MAX,
   MAX_RETRY_AFTER,
+  MAX_TURNS,
+  modelOf,
   PASSING,
   PROMPT,
   PROPOSABLE,
@@ -20,6 +24,7 @@ import {
   schema,
   signature,
   TEXTS,
+  TUNABLE,
   task,
   translationBody,
   usageOf,
@@ -478,6 +483,109 @@ describe("the schemas and the tasks", () => {
         fix: "claude-opus-5-5 xhigh",
         translate: "claude-sonnet-5-5 medium",
       },
+    );
+  });
+
+  it("lets a copy tune its model, effort, budget and turns by kind, never its tools", () => {
+    assert.deepEqual(limitsOf(), LIMITS);
+    assert.deepEqual(limitsOf({ model: "  ", limits: " " }), LIMITS);
+    // PAGER_MODEL is the short form for every kind, and PAGER_LIMITS wins by kind.
+    const tuned = limitsOf({
+      model: "claude-sonnet-5-5",
+      limits: JSON.stringify({
+        fix: { model: "claude-opus-5-5", budget: "1.50", effort: "high" },
+        draft: { turns: 8, budget: 2 },
+        text: { turns: "20" },
+        translate: { turns: "" },
+      }),
+    });
+    assert.deepEqual(tuned, {
+      text: { ...LIMITS.text, model: "claude-sonnet-5-5", turns: 20 },
+      draft: {
+        ...LIMITS.draft,
+        model: "claude-sonnet-5-5",
+        turns: 8,
+        budget: "2",
+      },
+      fix: {
+        ...LIMITS.fix,
+        model: "claude-opus-5-5",
+        budget: "1.50",
+        effort: "high",
+      },
+      translate: { ...LIMITS.translate, model: "claude-sonnet-5-5" },
+    });
+    // The limits of the template stay as they are.
+    assert.equal(LIMITS.draft.model, "claude-opus-5-5");
+    assert.deepEqual(TUNABLE, ["model", "effort", "budget", "turns"]);
+    assert.deepEqual(
+      limitsOf({ limits: '{"text": {"effort": "max", "turns": 500}}' }).text,
+      { ...LIMITS.text, effort: "max", turns: MAX_TURNS },
+    );
+    assert.ok(EFFORTS.includes(LIMITS.fix.effort));
+  });
+
+  it("refuses a PAGER_MODEL or a PAGER_LIMITS that doesn't check out, naming it", () => {
+    assert.equal(modelOf(" claude-opus-5-5[1m] "), "claude-opus-5-5[1m]");
+    refuses(
+      () => limitsOf({ model: "opus 5" }),
+      /^PAGER_MODEL isn't the id of a model, such as claude-sonnet-5-5, but "opus 5"$/,
+    );
+    const wrong = (limits, pattern) =>
+      refuses(() => limitsOf({ limits: JSON.stringify(limits) }), pattern);
+    refuses(() => limitsOf({ limits: "{fix:" }), /^PAGER_LIMITS isn't JSON: /);
+    wrong([], /^PAGER_LIMITS isn't a JSON object by kind of job/);
+    wrong(null, /^PAGER_LIMITS isn't a JSON object by kind of job/);
+    wrong(
+      { review: {} },
+      /^PAGER_LIMITS names "review", which isn't a kind of job: text, draft, fix, translate$/,
+    );
+    wrong(
+      { fix: "cheap" },
+      /^PAGER_LIMITS gives fix something other than an object of model, effort, budget, turns$/,
+    );
+    wrong({ fix: [] }, /^PAGER_LIMITS gives fix something other than/);
+    wrong(
+      { text: { tools: "Read,Bash" } },
+      /^PAGER_LIMITS can't set tools of text: the tools and the mode/,
+    );
+    wrong(
+      { draft: { mode: "bypassPermissions" } },
+      /^PAGER_LIMITS can't set mode of draft/,
+    );
+    wrong(
+      { draft: { speed: 1 } },
+      /^PAGER_LIMITS sets "speed" of draft, which is none of model, effort, budget, turns$/,
+    );
+    wrong(
+      { draft: { model: "a b" } },
+      /^PAGER_LIMITS sets model of draft to something that isn't the id of a model/,
+    );
+    wrong({ draft: { model: 5 } }, /^PAGER_LIMITS sets model of draft/);
+    wrong(
+      { fix: { effort: "ultra" } },
+      /^PAGER_LIMITS sets effort of fix to "ultra", not one of low, medium, high, xhigh, max$/,
+    );
+    for (const budget of ["0", 0, "-1", "1.505", "abc", "10000", true, "1e2"]) {
+      wrong(
+        { fix: { budget } },
+        /^PAGER_LIMITS sets budget of fix to .+, not a number of dollars above 0 such as "1.50"$/,
+      );
+    }
+    for (const turns of [0, -3, 1.5, "12a", MAX_TURNS + 1, null, "0"]) {
+      wrong(
+        { text: { turns } },
+        /^PAGER_LIMITS sets turns of text to .+, not a whole number from 1 to 500, or "" for no limit$/,
+      );
+    }
+    // A key that would reach the prototype is no kind and no setting either.
+    refuses(
+      () => limitsOf({ limits: '{"__proto__": {"model": "x"}}' }),
+      /names "__proto__"/,
+    );
+    refuses(
+      () => limitsOf({ limits: '{"fix": {"__proto__": 1}}' }),
+      /sets "__proto__" of fix/,
     );
   });
 
@@ -950,6 +1058,28 @@ describe("the body for the pager", () => {
     assert.equal(
       body({ ...asked, message: 0 }, { plan: '{"answer":"Pong."}' }).message,
       undefined,
+    );
+  });
+
+  it("names the effort that the job prepare handed on, as PAGER_LIMITS set it", () => {
+    assert.equal(
+      answerBody(
+        fix,
+        outcome({ plan: '{"note":"Fixed."}', usage }),
+        OWNER,
+        "high",
+      ).usage.effort,
+      "high",
+    );
+    // Anything else, such as no output of a job that never prepared, is the kind's.
+    assert.equal(
+      answerBody(
+        draft,
+        outcome({ plan: '{"reply":"Hi"}', usage }),
+        OWNER,
+        "huge",
+      ).usage.effort,
+      "high",
     );
   });
 

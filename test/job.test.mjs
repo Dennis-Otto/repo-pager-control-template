@@ -93,6 +93,46 @@ describe("prepare", () => {
     assert.equal(w.net.calls[0].headers.authorization, "Bearer ghs_test");
   });
 
+  it("hands on PAGER_LIMITS, and names one that doesn't check out as an error of the run", async () => {
+    const tuned = {};
+    for (const limits of ['{"text": {"budget": "0.20"}}', '{"text": 1}']) {
+      const w = await world(
+        new Net().on("POST", "/graphql", () => json({ data: {} })),
+      );
+      const event = join(w.dir, "event.json");
+      await writeFile(
+        event,
+        JSON.stringify({
+          action: "pager-text",
+          client_payload: { text: "Hi", message: 3 },
+        }),
+      );
+      const env = {
+        ...w.env,
+        GITHUB_EVENT_NAME: "repository_dispatch",
+        GITHUB_EVENT_PATH: event,
+        PAGER_INPUT: join(w.dir, "input"),
+        PAGER_MODEL: "claude-opus-5-5",
+        PAGER_LIMITS: limits,
+      };
+      assert.equal(await main("prepare", env, w.io), 0);
+      tuned[limits] = { lines: w.lines, got: outputs(await w.read("output")) };
+    }
+    const good = tuned['{"text": {"budget": "0.20"}}'];
+    assert.deepEqual(good.lines, ["A job of the kind text."]);
+    assert.deepEqual(
+      [good.got.model, good.got.budget, good.got.error],
+      ["claude-opus-5-5", "0.20", ""],
+    );
+    const wrong =
+      "PAGER_LIMITS gives text something other than an object of model, effort, budget, turns";
+    assert.deepEqual(tuned['{"text": 1}'].lines, [
+      annotation("error", `${wrong}.`),
+      `A job of the kind text, which Claude doesn't run: ${wrong}.`,
+    ]);
+    assert.equal(tuned['{"text": 1}'].got.error, wrong);
+  });
+
   it("tells a fix whether PAGER_FIX_WORKFLOWS allows it to change the CI", async () => {
     const tasks = [];
     for (const allowed of [undefined, "true"]) {
@@ -390,7 +430,8 @@ describe("answer", () => {
       join(transcript, "claude-execution-output.json"),
       JSON.stringify(execution),
     );
-    const { code } = await answer(w, {});
+    // The effort that the job prepare handed on, as PAGER_LIMITS may set it.
+    const { code } = await answer(w, { EFFORT: "medium" });
     assert.equal(code, 0);
     assert.deepEqual(net.calls[0].body, {
       type: "draft",
@@ -400,7 +441,7 @@ describe("answer", () => {
         turns: 3,
         seconds: 12,
         models: [{ model: "claude-opus-5-5", tokens: 24429 }],
-        effort: "high",
+        effort: "medium",
       },
     });
     assert.deepEqual(w.lines, ["The pager answered: drafted"]);
@@ -672,7 +713,7 @@ describe("the command line", () => {
     assert.equal(await main("deploy", w.env, w.io), 2);
     assert.match(
       w.lines[0],
-      /Unknown command deploy: prepare, access, smoke-fix, smoke-fix-check, pull-request, answer, forward, health, health-issue or template/,
+      /Unknown command deploy: prepare, access, smoke-fix, smoke-fix-check, pull-request, answer, forward, health, health-issue, doctor or template/,
     );
     await assert.rejects(
       main("answer", { ...w.env, JOB: "not json" }, w.io),
@@ -692,6 +733,22 @@ describe("the smoke test of a fix", () => {
     const got = outputs(await w.read("output"));
     assert.equal(got.tools, "Read,Grep,Glob,Edit,Write");
     assert.equal(got.mode, "acceptEdits");
+    assert.equal(got.model, "claude-sonnet-5-5");
+    // PAGER_MODEL is the model of every run, the smoke test's too.
+    const tuned = await world();
+    assert.equal(
+      await main(
+        "smoke-fix",
+        {
+          ...tuned.env,
+          PAGER_INPUT: join(tuned.dir, "input"),
+          PAGER_MODEL: "claude-haiku-5-5",
+        },
+        tuned.io,
+      ),
+      0,
+    );
+    assert.equal(outputs(await tuned.read("output")).model, "claude-haiku-5-5");
     assert.deepEqual(JSON.parse(got.schema).required, [
       "answer",
       "changed",

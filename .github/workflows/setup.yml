@@ -1,0 +1,63 @@
+name: Check the set-up
+
+# Started by hand from the Actions tab, after the set-up of README.md and whenever a
+# job fails for a reason of the set-up: checks the whole set-up of this control
+# repository in one run and writes one line per item into its summary, what is set
+# and works, or what is wrong and how to fix it. The job setup, without Claude:
+# each secret and variable that a copy needs, PAGER_MODEL and PAGER_LIMITS as the
+# job prepare checks them, the app of PAGER_APP on GitHub, what PAGER_FIX_TOKEN may
+# do here and the day on which it expires, the health of the pager as Health asks
+# for it, and that .github/dependabot.yml is gone and .github/template.json reads.
+# The job claude then asks Claude for two words, as Check the Claude token does, on
+# the runner of the jobs of Claude, which proves the token and the runner: in an
+# account without the egress-firewall runner it waits for one, and the summary of
+# the job setup says what to do then. It takes two words of the weekly limit.
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  setup:
+    name: Check the set-up
+    # The template has no set-up to check; every control repository made from it has.
+    if: github.repository != 'Dennis-Otto/repo-pager-control-template'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Check each secret, variable and file of the set-up
+        env:
+          # Whether the token of Claude is set, never the token: the job claude
+          # proves it.
+          CLAUDE_TOKEN_SET: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
+          PAGER_CONTROL_SECRET: ${{ secrets.PAGER_CONTROL_SECRET }}
+          PAGER_URL: ${{ vars.PAGER_URL }}
+          PAGER_APP: ${{ vars.PAGER_APP }}
+          PAGER_FIX_TOKEN: ${{ secrets.PAGER_FIX_TOKEN }}
+          PAGER_MODEL: ${{ vars.PAGER_MODEL }}
+          PAGER_LIMITS: ${{ vars.PAGER_LIMITS }}
+          GH_TOKEN: ${{ github.token }}
+        run: node pager/job.mjs doctor
+
+  claude:
+    name: Ask Claude for two words
+    needs: setup
+    # Also after a set-up that failed: its other lines stay worth knowing.
+    if: ${{ !cancelled() && github.repository != 'Dennis-Otto/repo-pager-control-template' }}
+    permissions:
+      contents: read
+    # The path that actionlint knows; the syntax $/ is newer than actionlint.
+    uses: ./.github/workflows/check-token.yml # zizmor: ignore[self-repository]
+    with:
+      runner: ${{ vars.PAGER_AI_RUNNER || 'ubuntu-24.04-firewall' }}
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

@@ -26,7 +26,8 @@ export const EVENTS = {
  * lines: Sonnet, the default of the subscription until now, at high effort. A
  * draft speaks for the maintainer to someone else: Opus at high effort. A fix changes code
  * that becomes a pull request: Opus at extra high effort. The variable PAGER_MODEL
- * may name another model for every kind.
+ * may name another model for every kind, and PAGER_LIMITS another model, effort,
+ * budget or turns for one kind, as limitsOf reads them.
  *
  * The budget, --max-budget-usd, is what caps a run; the turns, --max-turns, only
  * stop a loop. The Claude Code action fails a run whose result counts more turns
@@ -88,6 +89,138 @@ export const MAX_MODELS = 5;
 
 /** The id of a model as the pager takes it, such as claude-opus-5-5. */
 const MODEL = /^[\w.:@[\]/-]{1,100}$/;
+
+/** The efforts of Claude Code, from the least to the most. */
+export const EFFORTS = ["low", "medium", "high", "xhigh", "max"];
+
+/**
+ * What PAGER_LIMITS may set of a kind of job. Its tools and its mode stay those of
+ * LIMITS: they are what holds Claude to its task, so a copy can't widen them.
+ */
+export const TUNABLE = ["model", "effort", "budget", "turns"];
+
+/** A budget in dollars of the API, above 0 and below 10,000, in cents at most. */
+const BUDGET = /^(?:0|[1-9]\d{0,3})(?:\.\d{1,2})?$/;
+
+/** The most turns that PAGER_LIMITS may set; "" is no limit. */
+export const MAX_TURNS = 500;
+
+function isObject(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** PAGER_MODEL, checked: "" without it, or the id of a model. */
+export function modelOf(text = "") {
+  const model = text.trim();
+  if (model !== "" && !MODEL.test(model)) {
+    throw new Refusal(
+      `PAGER_MODEL isn't the id of a model, such as claude-sonnet-5-5, but ${JSON.stringify(model.slice(0, 40))}`,
+    );
+  }
+  return model;
+}
+
+/** One value of PAGER_LIMITS, checked, as the outputs of the job prepare carry it. */
+function tunedValue(kind, key, value) {
+  const where = `PAGER_LIMITS sets ${key} of ${kind}`;
+  if (key === "model") {
+    if (typeof value !== "string" || !MODEL.test(value)) {
+      throw new Refusal(
+        `${where} to something that isn't the id of a model, such as claude-sonnet-5-5`,
+      );
+    }
+    return value;
+  }
+  if (key === "effort") {
+    if (!EFFORTS.includes(value)) {
+      throw new Refusal(
+        `${where} to ${JSON.stringify(value)}, not one of ${EFFORTS.join(", ")}`,
+      );
+    }
+    return value;
+  }
+  if (key === "budget") {
+    const budget = typeof value === "number" ? String(value) : value;
+    if (
+      typeof budget !== "string" ||
+      !BUDGET.test(budget) ||
+      Number(budget) <= 0
+    ) {
+      throw new Refusal(
+        `${where} to ${JSON.stringify(value)}, not a number of dollars above 0 such as "1.50"`,
+      );
+    }
+    return budget;
+  }
+  // The turns: a whole number, or "" for no limit, as a fix and a translation have.
+  if (value === "") {
+    return "";
+  }
+  const turns =
+    typeof value === "string" && /^\d+$/.test(value) ? Number(value) : value;
+  if (!Number.isSafeInteger(turns) || turns < 1 || turns > MAX_TURNS) {
+    throw new Refusal(
+      `${where} to ${JSON.stringify(value)}, not a whole number from 1 to ${MAX_TURNS}, or "" for no limit`,
+    );
+  }
+  return turns;
+}
+
+/**
+ * The limits of each kind of job in this repository: those of LIMITS, with
+ * PAGER_MODEL, when set, as the model of every kind, and over them PAGER_LIMITS, a
+ * JSON object by kind of what it sets of that kind, such as
+ * {"draft": {"model": "claude-sonnet-5-5"}, "fix": {"budget": "1.50"}}. Throws a
+ * refusal that names the first value that doesn't check out.
+ */
+export function limitsOf({ model = "", limits = "" } = {}) {
+  const every = modelOf(model);
+  const tuned = Object.fromEntries(
+    Object.entries(LIMITS).map(([kind, set]) => [
+      kind,
+      every === "" ? { ...set } : { ...set, model: every },
+    ]),
+  );
+  const text = limits.trim();
+  if (text === "") {
+    return tuned;
+  }
+  let given;
+  try {
+    given = JSON.parse(text);
+  } catch (error) {
+    throw new Refusal(`PAGER_LIMITS isn't JSON: ${error.message}`);
+  }
+  if (!isObject(given)) {
+    throw new Refusal(
+      'PAGER_LIMITS isn\'t a JSON object by kind of job, such as {"fix": {"budget": "1.50"}}',
+    );
+  }
+  const kinds = Object.keys(LIMITS);
+  for (const [kind, set] of Object.entries(given)) {
+    if (!kinds.includes(kind)) {
+      throw new Refusal(
+        `PAGER_LIMITS names ${JSON.stringify(kind.slice(0, 40))}, which isn't a kind of job: ${kinds.join(", ")}`,
+      );
+    }
+    if (!isObject(set)) {
+      throw new Refusal(
+        `PAGER_LIMITS gives ${kind} something other than an object of ${TUNABLE.join(", ")}`,
+      );
+    }
+    for (const [key, value] of Object.entries(set)) {
+      if (!TUNABLE.includes(key)) {
+        throw new Refusal(
+          ["tools", "mode"].includes(key)
+            ? `PAGER_LIMITS can't set ${key} of ${kind}: the tools and the mode of each kind are what holds Claude to its task`
+            : `PAGER_LIMITS sets ${JSON.stringify(key.slice(0, 40))} of ${kind}, which is none of ${TUNABLE.join(", ")}`,
+        );
+      }
+      tuned[kind][key] = tunedValue(kind, key, value);
+    }
+  }
+  return tuned;
+}
 
 /**
  * The longest text of the maintainer, an answer, a reply and a note of a fix, and the most
@@ -899,11 +1032,12 @@ function why(outcome, say) {
  * The body that goes back to the pager for a job and what came of it: an answer, a
  * proposal, a draft, a note on the thing or the end of a job that failed, which
  * brings its button back. The texts for a thing stay short: its message shows 500
- * characters of a note. The usage names the effort of the kind, and an answer to a
- * text of the maintainer names its message, whose 👀 the pager turns into 👍, or into 😢
+ * characters of a note. The usage names the effort that the run had, which the job
+ * prepare handed on, or else that of the kind in LIMITS, and an answer to a text of
+ * the maintainer names its message, whose 👀 the pager turns into 👍, or into 😢
  * when no answer came to be.
  */
-export function answerBody(job, outcome, owner) {
+export function answerBody(job, outcome, owner, effort = "") {
   let plan = null;
   let refusal = "";
   if (outcome.ask === "success") {
@@ -919,7 +1053,10 @@ export function answerBody(job, outcome, owner) {
   const usage =
     outcome.usage === null || outcome.usage === undefined
       ? undefined
-      : { ...outcome.usage, effort: LIMITS[job.kind].effort };
+      : {
+          ...outcome.usage,
+          effort: EFFORTS.includes(effort) ? effort : LIMITS[job.kind].effort,
+        };
   const say = textsOf(job);
   const run = `${say.run}: ${outcome.run}`;
   const failure = `${why({ ...outcome, refusal }, say)}. ${run}`;

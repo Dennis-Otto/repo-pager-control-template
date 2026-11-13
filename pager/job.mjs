@@ -10,6 +10,8 @@
 //                                     fail on what is wrong (health.yml)
 //   node pager/job.mjs health-issue   open or comment on the issue of a failed
 //                                     check, or close it after one that passed
+//   node pager/job.mjs doctor         check the whole set-up of this repository,
+//                                     one line per item (setup.yml)
 //   node pager/job.mjs template       bring the changes of the template as a pull
 //                                     request, merge it once its checks pass when
 //                                     the settings ask, and tell the pager
@@ -26,6 +28,7 @@
 // with the workflow commands of GitHub Actions. None of them runs on the machine on
 // which Claude ran, so nothing that Claude wrote runs here.
 import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
 import { appendFile, readdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -40,6 +43,7 @@ import {
   usageOf,
 } from "./core.mjs";
 import { deliver } from "./deliver.mjs";
+import { DEPENDABOT, doctor, summaryOf as setupSummary } from "./doctor.mjs";
 import { GitHub } from "./github.mjs";
 import { check, keepIssue, pagerReport, problemsOf } from "./health.mjs";
 import { prepare } from "./prepare.mjs";
@@ -47,6 +51,7 @@ import { gitIn, openPull, workflowsAllowed } from "./pull.mjs";
 import { checkSmokeFix, denialsOf, prepareSmokeFix } from "./smoke.mjs";
 import {
   reportOf,
+  SETTINGS,
   settle,
   short,
   summaryOf,
@@ -127,7 +132,7 @@ const commands = {
     // The smoke test names an event of its own: GitHub keeps GITHUB_* as they are.
     const path = env.PAGER_EVENT_PATH || env.GITHUB_EVENT_PATH;
     const event = JSON.parse(await readFile(path, "utf8"));
-    const { outputs } = await prepare({
+    const { outputs, settings } = await prepare({
       eventName: env.PAGER_EVENT_NAME || env.GITHUB_EVENT_NAME,
       event,
       owner: owner(env),
@@ -142,8 +147,14 @@ const commands = {
         run: env.GITHUB_RUN_ID,
         now: Date.now,
       },
+      tuning: { model: env.PAGER_MODEL ?? "", limits: env.PAGER_LIMITS ?? "" },
     });
     await writeOutputs(env.GITHUB_OUTPUT, outputs);
+    // A setting that doesn't check out holds every job until it is fixed: the run
+    // names it as an error, besides the answer that tells the pager.
+    if (settings !== "") {
+      io.log(annotation("error", `${settings}.`));
+    }
     return outputs.error === ""
       ? `A job of the kind ${outputs.kind}.`
       : `A job of the kind ${outputs.kind}, which Claude doesn't run: ${outputs.error}.`;
@@ -160,6 +171,7 @@ const commands = {
     const outputs = await prepareSmokeFix({
       out: env.PAGER_INPUT,
       read: (name) => readFile(join(HERE, name), "utf8"),
+      model: env.PAGER_MODEL ?? "",
     });
     await writeOutputs(env.GITHUB_OUTPUT, outputs);
     return "The smoke test of a fix, with the tools and the mode of a fix.";
@@ -223,7 +235,7 @@ const commands = {
       prepared: env.PREPARE_ERROR ?? "",
     };
     if (job.kind !== "translate") {
-      const body = answerBody(job, outcome, owner(env));
+      const body = answerBody(job, outcome, owner(env), env.EFFORT ?? "");
       return send(env, io, "The answer for the pager", body);
     }
     // Without a translation, the message keeps its English: a warning, no failure.
@@ -286,6 +298,52 @@ const commands = {
       if (!sent.sent) {
         io.log(annotation("warning", sent.note));
       }
+    }
+    // One annotation per problem; the last one fails the step.
+    for (const problem of problems.slice(0, -1)) {
+      io.log(annotation("error", problem));
+    }
+    throw new Refusal(problems.at(-1));
+  },
+
+  async doctor(env, io) {
+    const root = env.GITHUB_WORKSPACE;
+    let settings = null;
+    try {
+      settings = await readFile(join(root, SETTINGS), "utf8");
+    } catch (error) {
+      if (error?.code !== "ENOENT") {
+        throw error;
+      }
+    }
+    const text = (name) => env[name] ?? "";
+    const { lines, problems } = await doctor({
+      // The token of Claude stays out of this step: the workflow says only whether
+      // it is set, and the job after this one proves it.
+      set: {
+        CLAUDE_CODE_OAUTH_TOKEN: env.CLAUDE_TOKEN_SET === "true",
+        PAGER_CONTROL_SECRET: text("PAGER_CONTROL_SECRET") !== "",
+        PAGER_URL: text("PAGER_URL").trim() !== "",
+        PAGER_APP: text("PAGER_APP").trim() !== "",
+        PAGER_FIX_TOKEN: text("PAGER_FIX_TOKEN") !== "",
+      },
+      url: text("PAGER_URL").trim(),
+      secret: text("PAGER_CONTROL_SECRET"),
+      app: text("PAGER_APP").trim(),
+      token: text("PAGER_FIX_TOKEN"),
+      workflowToken: text("GH_TOKEN"),
+      repo: env.GITHUB_REPOSITORY,
+      model: text("PAGER_MODEL"),
+      limits: text("PAGER_LIMITS"),
+      dependabot: existsSync(join(root, DEPENDABOT)),
+      settings,
+      fetcher: io.fetch,
+      now: Date.now,
+      sleep: io.sleep,
+    });
+    await appendFile(env.GITHUB_STEP_SUMMARY, setupSummary(lines));
+    if (problems.length === 0) {
+      return `The set-up is complete: ${lines.length} items checked.`;
     }
     // One annotation per problem; the last one fails the step.
     for (const problem of problems.slice(0, -1)) {
@@ -432,7 +490,7 @@ export async function main(command, env, io) {
     io.log(
       annotation(
         "error",
-        `Unknown command ${command}: prepare, access, smoke-fix, smoke-fix-check, pull-request, answer, forward, health, health-issue or template.`,
+        `Unknown command ${command}: prepare, access, smoke-fix, smoke-fix-check, pull-request, answer, forward, health, health-issue, doctor or template.`,
       ),
     );
     return 2;
