@@ -112,6 +112,21 @@ describe("the workflows of the template", {
   });
 });
 
+describe("the workflow Tests", () => {
+  const text = read(`${WORKFLOWS}/test.yml`);
+
+  it("checks the diagrams without Docker, as npm run diagrams does", () => {
+    assert.equal(
+      JSON.parse(read("package.json")).scripts.diagrams,
+      "bash scripts/diagrams.sh --check",
+    );
+    assert.match(
+      text,
+      /^ {6}- name: Check the diagrams\n {8}if: \$\{\{ !cancelled\(\) \}\}\n {8}run: npm run diagrams$/m,
+    );
+  });
+});
+
 describe("the workflow Dependabot", () => {
   const text = read(`${WORKFLOWS}/${MERGE}`);
 

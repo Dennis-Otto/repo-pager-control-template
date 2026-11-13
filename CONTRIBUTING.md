@@ -18,9 +18,10 @@ You need Node 24 and npm.
 npm ci --ignore-scripts --no-audit --no-fund
 npm test        # the tests of pager/, with every line, branch and function covered
 npm run lint    # Biome: the lint and the format of the code
+npm run diagrams  # without Docker: no ```mermaid block, and a source and both pictures of each diagram
 ```
 
-`npx biome check --write .` fixes what Biome can fix by itself. The workflow [Tests](.github/workflows/test.yml) runs both on every pull request, and actionlint and zizmor on the workflows, from the images that `.github/tools/` pins; with Docker you can run them as that workflow does. A diagram is a Mermaid source in `docs/diagrams/`, and `bash scripts/diagrams.sh` draws its pictures in `docs/images/diagrams/`, with Docker.
+`npx biome check --write .` fixes what Biome can fix by itself. The workflow [Tests](.github/workflows/test.yml) runs all three on every pull request, and actionlint and zizmor on the workflows, from the images that `.github/tools/` pins; with Docker you can run them as that workflow does. A diagram is a Mermaid source in `docs/diagrams/`, and `bash scripts/diagrams.sh` draws its pictures in `docs/images/diagrams/`, with Docker. `npm run diagrams` fails on a picture without its source, a source that a page shows without both pictures, and a `mermaid` block in the Markdown, but it doesn't see a picture that is older than its source: after a change of a source, draw its pictures anew.
 
 A change of behaviour comes with its tests in `test/`, and a bug fix with a test that fails without the fix: the tests run the jobs against a simulated GitHub and a simulated pager in `test/fake.mjs`, never a real one. A change of what a workflow promises, such as its permissions, changes `test/workflows.test.mjs` with it, and the README says what changes for the owner of a copy.
 

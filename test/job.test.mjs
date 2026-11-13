@@ -698,6 +698,15 @@ describe("forward", () => {
     );
   });
 
+  it("takes the owner of this repository alone, whatever the environment of the run names", async () => {
+    const net = new Net().on("POST", "/control", () => new Response("asked"));
+    const w = await world(net);
+    const octocat = { ...asked, sender: { login: "octocat", type: "User" } };
+    assert.equal(await forward(w, octocat, { PAGER_OWNER: "octocat" }), 1);
+    assert.equal(net.calls.length, 0);
+    assert.match(w.lines[0], /^::error::only monalisa asks/);
+  });
+
   it("only shows a question in the summary while the pager isn't set up", async () => {
     const w = await world();
     const unset = { PAGER_URL: undefined, PAGER_CONTROL_SECRET: undefined };

@@ -96,8 +96,14 @@ async function transcript(folder) {
   }
 }
 
+/**
+ * The owner of this repository, from GitHub's own variable, which no setting of a
+ * copy changes: whose repositories the pager works on, and the one person whose
+ * agents ask through it. An organization has no such person, so there the workflow
+ * Agents refuses every event, as the README says.
+ */
 function owner(env) {
-  return env.PAGER_OWNER || env.GITHUB_REPOSITORY_OWNER;
+  return env.GITHUB_REPOSITORY_OWNER;
 }
 
 /** The address of the run of the workflow, from GitHub's own variables. */
