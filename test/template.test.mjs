@@ -219,12 +219,16 @@ describe("the settings of the template", () => {
 
   it("keeps the files for the template's contributors out of every copy", async () => {
     // A copy needs neither the guide of contributing nor the issue forms nor the
-    // template of a pull request: `own` of the template lists each that is here.
+    // template of a pull request, nor the social preview of a public repository:
+    // `own` of the template lists each that is here.
     const root = new URL("../", import.meta.url);
     const { own } = settingsOf(await readFile(new URL(SETTINGS, root), "utf8"));
     const paths = [
       "CONTRIBUTING.md",
       ".github/pull_request_template.md",
+      ".github/social-preview.html",
+      ".github/social-preview.png",
+      "scripts/social-preview.sh",
       ...(
         await readdir(new URL(".github/ISSUE_TEMPLATE/", root)).catch(() => [])
       ).map((name) => `.github/ISSUE_TEMPLATE/${name}`),
@@ -234,6 +238,34 @@ describe("the settings of the template", () => {
         assert.ok(isOwn(path, own), `${path} isn't in own of ${SETTINGS}`);
       }
     }
+  });
+});
+
+describe("the social preview of the template", () => {
+  const root = new URL("../", import.meta.url);
+
+  it("shows the diagram that the README shows", async () => {
+    const page = await readFile(
+      new URL(".github/social-preview.html", root),
+      "utf8",
+    );
+    const readme = await readFile(new URL("README.md", root), "utf8");
+    const pictures = [...page.matchAll(/<img src="\.\.\/([^"]+)"/g)].map(
+      (match) => match[1],
+    );
+    assert.deepEqual(pictures, [
+      "docs/images/diagrams/how-a-job-runs.dark.svg",
+    ]);
+    assert.ok(existsSync(new URL(pictures[0], root)));
+    assert.ok(readme.includes(`srcset="${pictures[0]}"`));
+    // Nothing from the network, so that the picture is the same offline.
+    assert.doesNotMatch(page, /\b(?:src|href)="(?:https?:)?\/\//);
+  });
+
+  it("is a picture of 1280 by 640 pixels, as GitHub asks for", async () => {
+    const png = await readFile(new URL(".github/social-preview.png", root));
+    assert.equal(png.subarray(1, 4).toString("latin1"), "PNG");
+    assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [1280, 640]);
   });
 });
 

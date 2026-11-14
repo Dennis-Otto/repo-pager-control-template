@@ -7,6 +7,9 @@
     "pager/voice.md",
     "CONTRIBUTING.md",
     ".github/ISSUE_TEMPLATE/",
-    ".github/pull_request_template.md"
+    ".github/pull_request_template.md",
+    ".github/social-preview.html",
+    ".github/social-preview.png",
+    "scripts/social-preview.sh"
   ]
 }
