@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Repo Pager control template: social preview</title>
+<!-- scripts/social-preview.sh photographs this page as .github/social-preview.png, the
+     1280×640 picture that GitHub shows for a link to the template. The diagram on the
+     right is the README's own picture of how a job runs, so a new drawing of
+     docs/diagrams/how-a-job-runs.mmd changes it too, once the script runs again. The
+     page loads nothing from the network: the fonts are those of the machine. -->
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1280px; height: 640px; overflow: hidden; }
+body {
+  --accent: #f38020;
+  position: relative;
+  font-family: "Inter", "Segoe UI", "Helvetica Neue", "Liberation Sans", "DejaVu Sans", sans-serif;
+  color: #f8fafc;
+  background:
+    radial-gradient(640px 560px at 80% 50%, color-mix(in srgb, #526cfe 16%, transparent), transparent 72%),
+    linear-gradient(135deg, #0a0f1d 0%, #0c1424 55%, #0b1a24 100%);
+}
+.left { position: absolute; left: 72px; top: 0; bottom: 0; width: 640px; display: flex; flex-direction: column; justify-content: center; }
+.logo { width: 88px; height: 88px; margin-bottom: 32px; }
+.logo svg { width: 100%; height: 100%; display: block; }
+h1 { font-size: 60px; font-weight: 800; line-height: 1.05; letter-spacing: -0.025em; }
+.subtitle { margin-top: 14px; font-size: 32px; font-weight: 700; color: var(--accent); letter-spacing: -0.01em; }
+ul { margin-top: 38px; list-style: none; display: grid; gap: 16px; }
+li { font-size: 24px; color: #cbd5e1; display: flex; align-items: center; gap: 18px; }
+li::before { content: ""; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 14px var(--accent); flex: none; }
+.diagram { position: absolute; right: 64px; top: 24px; bottom: 24px; display: flex; align-items: center; }
+.diagram img { height: 592px; width: auto; display: block; border-radius: 14px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45), 0 0 70px color-mix(in srgb, #526cfe 20%, transparent); }
+</style>
+</head>
+<body>
+<div class="left">
+  <div class="logo"><svg viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A speech bubble with a bell">
+    <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fdba74"/><stop offset="1" stop-color="#ea580c"/></linearGradient></defs>
+    <path d="M18 12h60a10 10 0 0 1 10 10v38a10 10 0 0 1-10 10H46L28 84V70H18A10 10 0 0 1 8 60V22a10 10 0 0 1 10-10z" fill="url(#g)"/>
+    <path d="M48 22a3 3 0 0 1 3 3v1.6c6.4 1.4 10.5 7 10.5 13.6v7.8l4 5.4a1.6 1.6 0 0 1-1.3 2.6H31.8a1.6 1.6 0 0 1-1.3-2.6l4-5.4v-7.8c0-6.6 4.1-12.2 10.5-13.6V25a3 3 0 0 1 3-3z" fill="#fff"/>
+    <path d="M42.5 59h11a5.5 5.5 0 0 1-11 0z" fill="#fff"/>
+  </svg></div>
+  <h1>Repo Pager<br>control template</h1>
+  <div class="subtitle">The jobs of your own pager</div>
+  <ul>
+    <li>Claude Code with your own subscription</li>
+    <li>Drafts, fixes, answers and translations</li>
+    <li>Signed answers; only your press acts</li>
+  </ul>
+</div>
+<div class="diagram">
+  <img src="../docs/images/diagrams/how-a-job-runs.dark.svg" alt="How a job of the pager runs, from your press in Telegram through the jobs prepare, ask, pull-request and answer back to Telegram">
+</div>
+</body>
+</html>

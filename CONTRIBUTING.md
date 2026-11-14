@@ -2,7 +2,7 @@
 
 Thank you for helping with the template of the control repository of [Repo Pager](https://github.com/Dennis-Otto/repo-pager). Every control repository is a private copy of this template and takes its changes through its workflow *Template*, so a pull request here reaches all of them. A change that only your own copy needs belongs in that copy, in a file of its `own` in `.github/template.json`.
 
-This file, the issue forms in `.github/ISSUE_TEMPLATE/` and `.github/pull_request_template.md` are for the template alone: `own` of the template's `.github/template.json` lists them, so the workflow *Template* never brings them to a copy.
+This file, the issue forms in `.github/ISSUE_TEMPLATE/`, `.github/pull_request_template.md` and the social preview, which `scripts/social-preview.sh` draws from `.github/social-preview.html`, are for the template alone: `own` of the template's `.github/template.json` lists them, so the workflow *Template* never brings them to a copy.
 
 ## Report a bug or propose a change
 
