@@ -150,8 +150,9 @@ jobs:
   pull-request:
     name: Open the pull request of the fix
     needs: [prepare, ask, ask-again]
-    # Also when ask-again didn't run, which a job after it otherwise takes for a stop.
-    if: ${{ !cancelled() && (needs.ask-again.outputs.changed || needs.ask.outputs.changed) == 'true' }}
+    # Also when ask-again didn't run, which a job after it otherwise takes for a stop,
+    # but only with a change of the try that ran Claude and succeeded, as ASK_RESULT.
+    if: ${{ !cancelled() && (needs.ask.outputs.missing == 'true' && needs.ask-again.result || needs.ask.result) == 'success' && (needs.ask-again.outputs.changed || needs.ask.outputs.changed) == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:

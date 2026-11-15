@@ -276,7 +276,8 @@ describe("the workflow Pager", () => {
     assert.match(pull, /^ {4}needs: \[prepare, ask, ask-again\]$/m);
     assert.match(
       pull,
-      /^ {4}if: \$\{\{ !cancelled\(\) && \(needs\.ask-again\.outputs\.changed \|\| needs\.ask\.outputs\.changed\) == 'true' \}\}$/m,
+      /^ {4}if: \$\{\{ !cancelled\(\) && \(needs\.ask\.outputs\.missing == 'true' && needs\.ask-again\.result \|\| needs\.ask\.result\) == 'success' && \(needs\.ask-again\.outputs\.changed \|\| needs\.ask\.outputs\.changed\) == 'true' \}\}$/m,
+      "a failed try opens no pull request, even with a change",
     );
     for (const output of ["plan", "base"]) {
       assert.match(
