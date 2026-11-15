@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 import { gzipSync } from "node:zlib";
-
+import { schema } from "../pager/core.mjs";
 import {
   chunksOf,
   dataOutputs,
@@ -122,6 +122,20 @@ describe("the size of outputs", () => {
     assert.ok(PACK.outputs < 1_048_576);
     assert.ok(2 * PACK.patch * PACK.chunk < 1_048_576 - PACK.outputs / 4);
     assert.ok(PACK.chunk + "PACK1=".length < 131_072);
+  });
+
+  it("keeps the change of a fix and the largest plan of Claude together under GitHub's limit", () => {
+    const { properties } = schema("fix");
+    const strings = Object.values(properties).filter(
+      (property) => property.type === "string",
+    );
+    assert.ok(strings.every((property) => property.maxLength > 0));
+    // Each character of a string may take six in JSON, as an escape such as \u001b, two bytes each.
+    const plan =
+      2 *
+      (6 * strings.reduce((sum, { maxLength }) => sum + maxLength, 0) + 200);
+    const patch = 2 * (PACK.patch * PACK.chunk + 200);
+    assert.ok(plan + patch < 1_048_576);
   });
 });
 
