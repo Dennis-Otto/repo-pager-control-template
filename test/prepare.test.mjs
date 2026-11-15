@@ -1,18 +1,22 @@
 // What the first job collects for Claude, with the read-only token, on a simulated
 // GitHub: the state of the repositories, a thread, and the logs of what fails.
 import assert from "node:assert/strict";
+import { randomBytes } from "node:crypto";
 import { mkdtemp, readdir, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
+import { gunzipSync } from "node:zlib";
 
-import { LIMITS } from "../pager/core.mjs";
+import { LIMITS, MAX } from "../pager/core.mjs";
 import { GitHub, GitHubError } from "../pager/github.mjs";
+import { PACK, sha256Of, sizeOf } from "../pager/pack.mjs";
 import {
   BY_ITSELF,
   byItself,
   excerpt,
   failures,
+  fit,
   healthRun,
   held,
   prepare,
@@ -1418,5 +1422,344 @@ describe("a job that the owner holds", () => {
       prepareTuned(new Net(), EVENTS.fix, { model: 5 }),
       TypeError,
     );
+  });
+});
+
+describe("the pack of the data of a job", () => {
+  /** Text that gzip can't make smaller, as the worst case of what strangers write. */
+  const noise = (length) =>
+    randomBytes(Math.ceil((length * 3) / 4))
+      .toString("base64")
+      .slice(0, length);
+
+  /** The files of a tar in the format ustar, as tar in ask.yml reads them. */
+  function untar(bytes) {
+    const files = {};
+    let at = 0;
+    while (bytes[at] !== 0) {
+      const name = bytes.toString("utf8", at, at + 100).replace(/\0.*$/s, "");
+      const size = Number.parseInt(
+        bytes.toString("utf8", at + 124, at + 135),
+        8,
+      );
+      const type = bytes.toString("utf8", at + 156, at + 157);
+      at += 512;
+      if (type === "0") {
+        files[name] = bytes.toString("utf8", at, at + size);
+      }
+      at += Math.ceil(size / 512) * 512;
+    }
+    return files;
+  }
+
+  /**
+   * Prepare a job, and check that its outputs keep GitHub's limit and that the pack
+   * in them, checked by its sha256, holds the files of the folder that is uploaded.
+   */
+  async function packed(net, event, budget) {
+    const out = await mkdtemp(join(tmpdir(), "pager-"));
+    const { outputs } = await prepare({
+      eventName: "repository_dispatch",
+      event,
+      owner: OWNER,
+      api: api(net),
+      out,
+      read,
+      budget,
+    });
+    assert.ok(sizeOf(outputs) <= (budget ?? PACK.outputs), "within the budget");
+    let text = "";
+    for (let index = 1; index <= PACK.data; index += 1) {
+      assert.ok(outputs[`pack${index}`].length <= PACK.chunk);
+      text += outputs[`pack${index}`];
+    }
+    const gzip = Buffer.from(text, "base64");
+    assert.equal(sha256Of(gzip), outputs.pack_sha256);
+    const files = untar(gunzipSync(gzip));
+    if (outputs.error === "") {
+      for (const name of Object.keys(files)) {
+        assert.equal(files[name], await readFile(join(out, name), "utf8"));
+      }
+    }
+    return { outputs, files };
+  }
+
+  const comment = (index) => ({
+    html_url: `https://github.com/${REPO}/issues/12#issuecomment-${index}`,
+    user: { login: "octocat" },
+    author_association: "NONE",
+    created_at: "2026-11-02T00:00:00Z",
+    body: noise(READ.comment + 10),
+  });
+
+  /** A pull request with the most of everything that READ allows, as noise. */
+  function largestPull() {
+    const files = Array.from({ length: 100 }, (_, index) => ({
+      filename: `f${index}`,
+      status: "modified",
+      additions: 1,
+      deletions: 0,
+      patch: noise(READ.patch + 10),
+    }));
+    return new Net()
+      .on("GET", "/issues/12", () =>
+        json({
+          html_url: `https://github.com/${REPO}/pull/12`,
+          title: "A change",
+          state: "open",
+          user: { login: "octocat" },
+          body: noise(READ.body + 10),
+        }),
+      )
+      .on("GET", "/issues/12/comments?per_page=100", () =>
+        json(Array.from({ length: 100 }, (_, index) => comment(index))),
+      )
+      .on("GET", "/issues/comments/7", () => json(comment(7)))
+      .on("GET", "/pulls/12", () => json({ additions: 100, deletions: 0 }))
+      .on("GET", "/pulls/12/files?per_page=100", () => json(files));
+  }
+  const pullEvent = {
+    action: "pager-draft",
+    client_payload: {
+      item: ITEM,
+      repo: REPO,
+      number: 12,
+      pull: true,
+      issueComment: 7,
+    },
+  };
+
+  it("fits the largest draft of a pull request that READ allows, as it is", async () => {
+    const { outputs, files } = await packed(largestPull(), pullEvent);
+    assert.equal(outputs.error, "");
+    const shown = JSON.parse(files["thread.json"]);
+    assert.equal(shown.body.length, READ.body + 1);
+    assert.equal(shown.answering.body.length, READ.comment + 1);
+    assert.equal(shown.comments.length, READ.comments);
+    assert.equal(shown.omitted, undefined);
+    // Each patch cut by READ ends with a …, besides its share of READ.patches.
+    assert.ok(
+      shown.pull.files.reduce((sum, file) => sum + file.patch.length, 0) >
+        READ.patches,
+    );
+    assert.equal(files["voice.md"], "the file voice.md");
+  });
+
+  it("leaves out the older comments of a draft that doesn't fit, and then halves its patches", async () => {
+    const half = await packed(largestPull(), pullEvent, PACK.outputs / 2);
+    assert.equal(half.outputs.error, "");
+    const shown = JSON.parse(half.files["thread.json"]);
+    // The body, the answered comment and the newest comments stay.
+    assert.equal(shown.body.length, READ.body + 1);
+    assert.equal(shown.answering.body.length, READ.comment + 1);
+    assert.ok(shown.comments.length > 0);
+    assert.equal(shown.comments.length + shown.omitted.comments, READ.comments);
+    assert.equal(
+      shown.comments.at(-1).url,
+      `https://github.com/${REPO}/issues/12#issuecomment-99`,
+    );
+    const quarter = await packed(largestPull(), pullEvent, PACK.outputs / 4);
+    assert.equal(quarter.outputs.error, "");
+    // The largest part goes first: the comments, until the patches are larger.
+    const less = JSON.parse(quarter.files["thread.json"]);
+    assert.ok(less.comments.length < shown.comments.length);
+    assert.equal(
+      less.comments.at(-1).url,
+      `https://github.com/${REPO}/issues/12#issuecomment-99`,
+    );
+    const patches = less.pull.files.map((file) => file.patch.length);
+    assert.ok(patches.reduce((sum, length) => sum + length, 0) < READ.patches);
+    assert.ok(patches.some((length) => length > 0));
+  });
+
+  it("fits the largest draft of a discussion that READ allows, the newest comments with their replies", async () => {
+    const message = (url) => ({
+      url,
+      body: noise(READ.comment + 10),
+      createdAt: "2026-11-07T00:00:00Z",
+      authorAssociation: "NONE",
+      author: { login: "octocat" },
+    });
+    const discussion = `https://github.com/${REPO}/discussions/31`;
+    const net = new Net().on("POST", "/graphql", () =>
+      json({
+        data: {
+          repository: {
+            discussion: {
+              ...message(discussion),
+              body: noise(READ.body + 10),
+              title: "Getting started",
+              closed: false,
+              category: { name: "Q&A" },
+              comments: {
+                nodes: Array.from({ length: READ.comments }, (_, index) => ({
+                  ...message(`${discussion}#c${index}`),
+                  replies: {
+                    nodes: Array.from({ length: READ.replies }, (_, reply) =>
+                      message(`${discussion}#c${index}r${reply}`),
+                    ),
+                  },
+                })),
+              },
+            },
+          },
+        },
+      }),
+    );
+    const { outputs, files } = await packed(net, {
+      action: "pager-draft",
+      client_payload: {
+        item: ITEM,
+        repo: REPO,
+        number: 31,
+        pull: false,
+        discussion: true,
+      },
+    });
+    assert.equal(outputs.error, "");
+    const shown = JSON.parse(files["thread.json"]);
+    assert.ok(shown.comments.length > 0);
+    const newest = shown.comments.at(-1);
+    assert.equal(newest.url, `${discussion}#c${READ.comments - 1}`);
+    assert.equal(newest.replies.length, READ.replies);
+  });
+
+  /** The log of a job with a failed step, of `lines` lines of noise. */
+  const log = (lines) =>
+    [
+      "2026-11-04T01:02:03.4567890Z ##[group]Run npm test",
+      "2026-11-04T01:02:03.4567890Z ##[endgroup]",
+      ...Array.from(
+        { length: lines },
+        () => `2026-11-04T01:02:03.4567890Z ${noise(READ.line + 10)}`,
+      ),
+      "2026-11-04T01:02:03.4567890Z ##[error]Process completed with exit code 1.",
+    ].join("\n");
+
+  it("fits the largest fix that READ allows, each log with its error, and the texts of the issues", async () => {
+    const net = new Net()
+      .on("GET", /\/actions\/jobs\/\d+\/logs$/, () => new Response(log(2000)))
+      .on("GET", /\/issues\/\d+$/, () =>
+        json({ title: "A bot fails", body: noise(READ.body + 10) }),
+      );
+    const entries = Array.from({ length: MAX.entries }, (_, index) => ({
+      label: `entry ${index}`,
+      url:
+        index < READ.jobs
+          ? `https://github.com/${REPO}/actions/runs/5/job/${index + 1}`
+          : `https://github.com/${REPO}/issues/${index}`,
+    }));
+    const { outputs, files } = await packed(net, {
+      action: "pager-fix",
+      client_payload: { item: ITEM, repo: REPO, kind: "alarm", entries },
+    });
+    assert.equal(outputs.error, "");
+    const logs = Object.keys(files).filter((name) => name.startsWith("logs/"));
+    assert.equal(logs.length, READ.jobs);
+    for (const name of logs) {
+      assert.match(files[name], /^##\[group\]Run npm test$/m);
+      assert.match(
+        files[name],
+        /^##\[error\]Process completed with exit code 1\.$/m,
+      );
+    }
+    const found = JSON.parse(files["failures.json"]);
+    assert.equal(found.length, MAX.entries);
+    assert.ok(found.at(-1).issue.body.length > 0);
+  });
+
+  it("holds a job whose data no cut makes fit, and says why", async () => {
+    const tiny = 30_000;
+    const pull = await packed(largestPull(), pullEvent, tiny);
+    assert.match(pull.outputs.error, /^the data of the job is too large/);
+    assert.deepEqual(Object.keys(pull.files), []);
+    const issue = new Net()
+      .on("GET", "/issues/12", () => json({ body: noise(READ.body) }))
+      .on("GET", "/issues/12/comments?per_page=100", () =>
+        json([comment(1), comment(2)]),
+      );
+    const { outputs } = await packed(
+      issue,
+      {
+        action: "pager-draft",
+        client_payload: { item: ITEM, repo: REPO, number: 12, pull: false },
+      },
+      tiny,
+    );
+    assert.match(outputs.error, /^the data of the job is too large/);
+    const fix = new Net()
+      .on("GET", /\/actions\/jobs\/\d+\/logs$/, () => new Response(log(400)))
+      .on("GET", /\/issues\/\d+$/, () =>
+        json({ title: "A bot fails", body: noise(READ.body) }),
+      );
+    const fixed = await packed(
+      fix,
+      {
+        action: "pager-fix",
+        client_payload: {
+          item: ITEM,
+          repo: REPO,
+          kind: "alarm",
+          entries: [
+            { label: "a", url: `https://github.com/${REPO}/runs/5` },
+            { label: "b", url: `https://github.com/${REPO}/issues/9` },
+            { label: "c", url: `https://github.com/${REPO}/issues/10` },
+          ],
+        },
+      },
+      5_000,
+    );
+    assert.match(fixed.outputs.error, /^the data of the job is too large/);
+    // A free text has nothing to cut, and the state of the repositories is large.
+    const snapshot = new Net().on("POST", "/graphql", () =>
+      json({
+        data: {
+          ...SNAPSHOT,
+          issues: {
+            nodes: Array.from({ length: 50 }, (_, number) => ({
+              number,
+              title: noise(1000),
+              url: "u",
+              repository: { nameWithOwner: REPO },
+            })),
+          },
+        },
+      }),
+    );
+    const text = await packed(
+      snapshot,
+      {
+        action: "pager-text",
+        client_payload: { text: "How are my repositories?", message: 5 },
+      },
+      tiny,
+    );
+    assert.match(text.outputs.error, /^the data of the job is too large/);
+  });
+
+  it("hands on the data of a free text, which needs no cut", async () => {
+    const net = new Net().on("POST", "/graphql", () =>
+      json({ data: SNAPSHOT }),
+    );
+    const { outputs, files } = await packed(net, {
+      action: "pager-text",
+      client_payload: { text: "How are my repositories?", message: 5 },
+    });
+    assert.equal(outputs.error, "");
+    assert.equal(files["text.txt"], "How are my repositories?");
+    assert.deepEqual(Object.keys(files).sort(), [
+      "github.json",
+      "rules.md",
+      "task.md",
+      "text.txt",
+    ]);
+  });
+
+  it("gives up only when no cut is left", () => {
+    let cuts = 0;
+    const cut = { size: () => 1, cut: () => cuts++ < 2 };
+    assert.equal(fit({ "a.txt": noise(5000) }, [cut], 100), null);
+    assert.equal(cuts, 3);
+    assert.ok(fit({ "a.txt": "a" }, [], 1000).text.length > 0);
   });
 });

@@ -16,6 +16,8 @@ name: Pager
 #                that doesn't keep its notes sends nothing
 #
 # Each job runs on its own machine, and the secrets that write never meet Claude.
+# The data of the job reaches ask and the change of a fix comes back as outputs and
+# inputs, which travel with the jobs, not through the storage of the artifacts.
 # A job of the Actions tab, by hand, is a free text, to try the pager.
 #
 # PAGER_PAUSED holds every job, and PAGER_DAILY_RUNS the jobs that start without a
@@ -70,6 +72,11 @@ jobs:
       effort: ${{ steps.prepare.outputs.effort }}
       schema: ${{ steps.prepare.outputs.schema }}
       prompt: ${{ steps.prepare.outputs.prompt }}
+      pack1: ${{ steps.prepare.outputs.pack1 }}
+      pack2: ${{ steps.prepare.outputs.pack2 }}
+      pack3: ${{ steps.prepare.outputs.pack3 }}
+      pack4: ${{ steps.prepare.outputs.pack4 }}
+      pack_sha256: ${{ steps.prepare.outputs.pack_sha256 }}
       error: ${{ steps.prepare.outputs.error }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -91,7 +98,12 @@ jobs:
           PAGER_MODEL: ${{ vars.PAGER_MODEL }}
           PAGER_LIMITS: ${{ vars.PAGER_LIMITS }}
         run: node pager/job.mjs prepare
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      # What Claude gets, for the maintainer to look at: the job of Claude takes it
+      # from the outputs, so a failed upload fails nothing.
+      - name: Keep the data of the job
+        continue-on-error: true
+        timeout-minutes: 2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: pager-input
           path: pager-input/
@@ -118,6 +130,11 @@ jobs:
       effort: ${{ needs.prepare.outputs.effort }}
       schema: ${{ needs.prepare.outputs.schema }}
       prompt: ${{ needs.prepare.outputs.prompt }}
+      pack1: ${{ needs.prepare.outputs.pack1 }}
+      pack2: ${{ needs.prepare.outputs.pack2 }}
+      pack3: ${{ needs.prepare.outputs.pack3 }}
+      pack4: ${{ needs.prepare.outputs.pack4 }}
+      pack_sha256: ${{ needs.prepare.outputs.pack_sha256 }}
       # A miss of the data or of the checkout leaves this try green, for ask-again.
       retry: true
     secrets:
@@ -144,6 +161,11 @@ jobs:
       effort: ${{ needs.prepare.outputs.effort }}
       schema: ${{ needs.prepare.outputs.schema }}
       prompt: ${{ needs.prepare.outputs.prompt }}
+      pack1: ${{ needs.prepare.outputs.pack1 }}
+      pack2: ${{ needs.prepare.outputs.pack2 }}
+      pack3: ${{ needs.prepare.outputs.pack3 }}
+      pack4: ${{ needs.prepare.outputs.pack4 }}
+      pack_sha256: ${{ needs.prepare.outputs.pack_sha256 }}
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
@@ -172,11 +194,6 @@ jobs:
           ref: ${{ needs.ask-again.outputs.base || needs.ask.outputs.base }}
           path: repo
           persist-credentials: false
-      - name: Get the change of the fix
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: pager-fix
-          path: fix
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
@@ -190,7 +207,14 @@ jobs:
           # A fix changes no workflow or action unless the owner sets it to true.
           PAGER_FIX_WORKFLOWS: ${{ vars.PAGER_FIX_WORKFLOWS }}
           PAGER_REPO: repo
-          PAGER_PATCH: ${{ github.workspace }}/fix/fix.patch
+          # The change, packed in the outputs of the try that ran Claude, and where
+          # the step unpacks it.
+          PATCH1: ${{ needs.ask-again.outputs.patch1 || needs.ask.outputs.patch1 }}
+          PATCH2: ${{ needs.ask-again.outputs.patch2 || needs.ask.outputs.patch2 }}
+          PATCH3: ${{ needs.ask-again.outputs.patch3 || needs.ask.outputs.patch3 }}
+          PATCH_SHA256: ${{ needs.ask-again.outputs.patch_sha256 || needs.ask.outputs.patch_sha256 }}
+          PATCH_SIZE: ${{ needs.ask-again.outputs.patch_size || needs.ask.outputs.patch_size }}
+          PAGER_PATCH: ${{ runner.temp }}/fix.patch
         run: node pager/job.mjs pull-request
 
   answer:

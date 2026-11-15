@@ -41,6 +41,11 @@ jobs:
       effort: ${{ steps.prepare.outputs.effort }}
       schema: ${{ steps.prepare.outputs.schema }}
       prompt: ${{ steps.prepare.outputs.prompt }}
+      pack1: ${{ steps.prepare.outputs.pack1 }}
+      pack2: ${{ steps.prepare.outputs.pack2 }}
+      pack3: ${{ steps.prepare.outputs.pack3 }}
+      pack4: ${{ steps.prepare.outputs.pack4 }}
+      pack_sha256: ${{ steps.prepare.outputs.pack_sha256 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -68,7 +73,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PAGER_SMOKE_REPOSITORY: ${{ vars.PAGER_SMOKE_REPOSITORY }}
         run: node pager/job.mjs access
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      # What Claude gets, for the maintainer to look at: the job of Claude takes it
+      # from the outputs, so a failed upload fails nothing.
+      - name: Keep the data of the job
+        continue-on-error: true
+        timeout-minutes: 2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: pager-input
           path: pager-input/
@@ -92,6 +102,11 @@ jobs:
       effort: ${{ needs.prepare.outputs.effort }}
       schema: ${{ needs.prepare.outputs.schema }}
       prompt: ${{ needs.prepare.outputs.prompt }}
+      pack1: ${{ needs.prepare.outputs.pack1 }}
+      pack2: ${{ needs.prepare.outputs.pack2 }}
+      pack3: ${{ needs.prepare.outputs.pack3 }}
+      pack4: ${{ needs.prepare.outputs.pack4 }}
+      pack_sha256: ${{ needs.prepare.outputs.pack_sha256 }}
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 

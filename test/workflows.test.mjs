@@ -11,6 +11,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
+import { PACK } from "../pager/pack.mjs";
 import { BY_ITSELF } from "../pager/prepare.mjs";
 import { WAIT } from "../pager/template.mjs";
 import { IN_TEMPLATE, ROOT } from "./where.mjs";
@@ -436,5 +437,158 @@ describe("the workflow Check the set-up", () => {
         /github\.repository != 'Dennis-Otto\/repo-pager-control-template'/,
       );
     }
+  });
+});
+
+// The job of Claude runs on the egress-firewall runner, which now and then doesn't
+// reach the storage of the artifacts: its data comes in its inputs, its change goes
+// back in its outputs, packed as pager/pack.mjs says, and nothing that it needs or
+// hands on goes through that storage.
+describe("the hand-over of the data and the change", () => {
+  const ask = read(`${WORKFLOWS}/ask.yml`);
+  const numbered = (name, count) =>
+    Array.from({ length: count }, (_, index) => `${name}${index + 1}`);
+  const packs = numbered("pack", PACK.data);
+  const patches = numbered("patch", PACK.patch);
+
+  /** The steps of a workflow, each the text from its `- ` to the next one. */
+  const stepsOf = (text) =>
+    text
+      .split(/\n(?= {6}- )/)
+      .slice(1)
+      .map((step) => step.split(/\n(?! {7,}| *$)/)[0]);
+
+  it("gives the job of Claude no download of an artifact, and lets no upload fail a job", () => {
+    assert.doesNotMatch(ask, /download-artifact/);
+    for (const { name, text } of workflows) {
+      for (const step of stepsOf(text)) {
+        if (step.includes("actions/upload-artifact@")) {
+          assert.match(step, /^ {8}continue-on-error: true$/m, name);
+          assert.match(step, /^ {8}timeout-minutes: \d$/m, name);
+        }
+        if (step.includes("actions/download-artifact@")) {
+          // Only the transcript, for the usage of the answer and the checks of
+          // the smoke tests, on an ordinary runner after Claude's job.
+          assert.match(step, /^ {10}name: pager-transcript$/m, name);
+        }
+      }
+    }
+  });
+
+  it("takes the pack of the data in as many inputs as PACK.data, and hands back the change in PACK.patch outputs", () => {
+    for (const name of packs) {
+      assert.match(
+        ask,
+        new RegExp(
+          `^ {6}${name}:\\n {8}description: .+\\n {8}type: string\\n {8}default: ""$`,
+          "m",
+        ),
+      );
+    }
+    assert.doesNotMatch(ask, new RegExp(`^ {6}pack${PACK.data + 1}:`, "m"));
+    assert.match(
+      ask,
+      /^ {6}pack_sha256:\n {8}description: .+\n {8}type: string\n {8}required: true$/m,
+    );
+    for (const name of [...patches, "patch_sha256", "patch_size"]) {
+      assert.match(
+        ask,
+        new RegExp(
+          `^ {6}${name}: \\$\\{\\{ steps\\.patch\\.outputs\\.${name} \\}\\}$`,
+          "m",
+        ),
+      );
+      assert.match(
+        ask,
+        new RegExp(
+          `^ {8}value: \\$\\{\\{ jobs\\.ask\\.outputs\\.${name} \\}\\}$`,
+          "m",
+        ),
+      );
+    }
+    assert.doesNotMatch(ask, new RegExp(`patch${PACK.patch + 1}`));
+    // The script packs in the chunks of PACK.
+    assert.match(ask, new RegExp(`^ {10}chunk=${PACK.chunk}$`, "m"));
+    assert.match(ask, new RegExp(`^ {10}chunks=${PACK.patch}$`, "m"));
+  });
+
+  it("lets the pack reach a step of the job of Claude through env: alone, and no expression into a script", () => {
+    const lines = ask
+      .split("\n")
+      .filter((line) => line.includes("inputs.pack"));
+    assert.deepEqual(lines, [
+      ...packs.map(
+        (name) => `          ${name.toUpperCase()}: \${{ inputs.${name} }}`,
+      ),
+      `          PACK_SHA256: \${{ inputs.pack_sha256 }}`,
+    ]);
+    for (const { name, text } of workflows) {
+      for (const script of text.split(/^ +run: \|\n/m).slice(1)) {
+        const body = script.split(/\n(?! {10,}| *$)/)[0];
+        assert.doesNotMatch(body, /outputs\.(?:pack|patch)|inputs\.pack/, name);
+      }
+    }
+  });
+
+  it("hands the pack of the job prepare to every call of the job of Claude", () => {
+    for (const name of [
+      PAGER,
+      "smoke.yml",
+      "smoke-translate.yml",
+      "smoke-fix.yml",
+    ]) {
+      const text = read(`${WORKFLOWS}/${name}`);
+      const calls = text.match(
+        /^ {4}uses: \.\/\.github\/workflows\/ask\.yml /gm,
+      );
+      for (const pack of [...packs, "pack_sha256"]) {
+        assert.match(
+          text,
+          new RegExp(
+            `^ {6}${pack}: \\$\\{\\{ steps\\.prepare\\.outputs\\.${pack} \\}\\}$`,
+            "m",
+          ),
+          `${name} ${pack}`,
+        );
+        assert.equal(
+          text.match(
+            new RegExp(
+              `^ {6}${pack}: \\$\\{\\{ needs\\.prepare\\.outputs\\.${pack} \\}\\}$`,
+              "gm",
+            ),
+          ).length,
+          calls.length,
+          `${name} ${pack}`,
+        );
+      }
+    }
+  });
+
+  it("opens the pull request with the change of the try that ran Claude, unpacked where git applies it", () => {
+    const pager = read(`${WORKFLOWS}/${PAGER}`);
+    for (const [variable, output] of [
+      ...patches.map((name) => [name.toUpperCase(), name]),
+      ["PATCH_SHA256", "patch_sha256"],
+      ["PATCH_SIZE", "patch_size"],
+    ]) {
+      assert.match(
+        pager,
+        new RegExp(
+          `^ {10}${variable}: \\$\\{\\{ needs\\.ask-again\\.outputs\\.${output} \\|\\| needs\\.ask\\.outputs\\.${output} \\}\\}$`,
+          "m",
+        ),
+      );
+      assert.match(
+        read(`${WORKFLOWS}/smoke-fix.yml`),
+        new RegExp(
+          `^ {10}${variable}: \\$\\{\\{ needs\\.ask\\.outputs\\.${output} \\}\\}$`,
+          "m",
+        ),
+      );
+    }
+    assert.match(
+      pager,
+      /^ {10}PAGER_PATCH: \$\{\{ runner\.temp \}\}\/fix\.patch$/m,
+    );
   });
 });
