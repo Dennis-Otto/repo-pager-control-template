@@ -87,6 +87,27 @@ function folderOf(path) {
   return folder === "." ? "/" : `/${folder}`;
 }
 
+// GitHub refuses a pull request of Dependabot that changes a file below .github/ from any
+// ecosystem but github-actions, the one whose token may change that folder: the update
+// is found and committed, and handing it in fails with "The request contains invalid or
+// unauthorized changes" (dependabot/dependabot-core#15237). So npm and docker read their
+// pins in tools/, never below .github/.
+const PROTECTED = "/.github";
+
+/** Each folder of an ecosystem but github-actions that lies below .github/. */
+function refusedFolders(updaters) {
+  return [...updaters].flatMap(([ecosystem, folders]) =>
+    ecosystem === "github-actions"
+      ? []
+      : [...folders]
+          .filter(
+            (folder) =>
+              folder === PROTECTED || folder.startsWith(`${PROTECTED}/`),
+          )
+          .map((folder) => `${ecosystem} ${folder}`),
+  );
+}
+
 /** The image of the FROM of a Dockerfile, or null. */
 function imageOf(text) {
   return text.match(/^FROM\s+(\S+)/m)?.[1] ?? null;
@@ -123,8 +144,8 @@ describe("finding a pinned tool", () => {
     const text = [
       "run: npm ci --ignore-scripts",
       "run: npm test && npm run lint",
-      "run: .github/tools/claude-code/node_modules/.bin/claude -p hi",
-      `image="$(awk '$1 == "FROM" { print $2; exit }' .github/tools/zizmor.Dockerfile)"`,
+      "run: tools/claude-code/node_modules/.bin/claude -p hi",
+      `image="$(awk '$1 == "FROM" { print $2; exit }' tools/zizmor.Dockerfile)"`,
       'docker run --rm --volume "$PWD:/repo" --workdir /repo "$image"',
       "- uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1",
     ].join("\n");
@@ -139,9 +160,9 @@ describe("finding a pinned tool", () => {
         "  - package-ecosystem: github-actions",
         "    directory: /",
         '  - package-ecosystem: "npm"',
-        '    directories: ["/", "/.github/tools/claude-code/"]',
+        '    directories: ["/", "/tools/claude-code/"]',
         "  - package-ecosystem: docker",
-        "    directory: .github/tools",
+        "    directory: tools",
       ].join("\n"),
     );
     assert.deepEqual(
@@ -150,10 +171,25 @@ describe("finding a pinned tool", () => {
       ),
       {
         "github-actions": ["/"],
-        npm: ["/", "/.github/tools/claude-code"],
-        docker: ["/.github/tools"],
+        npm: ["/", "/tools/claude-code"],
+        docker: ["/tools"],
       },
     );
+  });
+
+  it("finds the folders below .github/ whose pull requests GitHub refuses", () => {
+    const updaters = new Map([
+      ["github-actions", new Set(["/", "/.github/actions/lint"])],
+      [
+        "npm",
+        new Set(["/", "/.github/tools/claude-code", "/tools/claude-code"]),
+      ],
+      ["docker", new Set(["/.github", "/.githubx", "/tools"])],
+    ]);
+    assert.deepEqual(refusedFolders(updaters), [
+      "npm /.github/tools/claude-code",
+      "docker /.github",
+    ]);
   });
 });
 
@@ -171,8 +207,8 @@ describe("the pins of this repository", {
   const reads = (ecosystem, folder) =>
     updaters.get(ecosystem)?.has(folder) ?? false;
   const runs = [...filesBelow(".github/workflows"), ...filesBelow("scripts")];
-  const packages = ["package.json", ...filesBelow(".github/tools")].filter(
-    (path) => path.endsWith("package.json"),
+  const packages = filesBelow(".").filter(
+    (path) => path.split("/").pop() === "package.json",
   );
   const dockerfiles = filesBelow(".").filter((path) =>
     /dockerfile/i.test(path.split("/").pop()),
@@ -191,8 +227,22 @@ describe("the pins of this repository", {
     assert.deepEqual(
       found,
       [],
-      "move each into a package.json or a Dockerfile of .github/tools/",
+      "move each into a package.json or a Dockerfile of tools/",
     );
+  });
+
+  it("has npm and docker read no folder below .github/, where GitHub refuses their pull requests", () => {
+    assert.deepEqual(
+      refusedFolders(updaters),
+      [],
+      `move each folder out of .github/ into tools/, and name it so in ${DEPENDABOT}`,
+    );
+    for (const path of [...packages, ...dockerfiles]) {
+      assert.ok(
+        !path.startsWith(".github/"),
+        `${path} lies below .github/, where Dependabot's pull request for it is refused: move it into tools/`,
+      );
+    }
   });
 
   it("has Dependabot keep the actions of the workflows current", () => {

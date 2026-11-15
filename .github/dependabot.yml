@@ -1,10 +1,14 @@
 # Dependabot keeps every pinned tool current: a pull request per update, which the tests
 # check and which merges by itself once they pass, through the workflow Dependabot in
 # .github/workflows/dependabot.yml. The actions of the workflows; Biome, in package.json,
-# and Claude Code of the workflow Check the Claude token, in .github/tools/claude-code/,
-# each with its package-lock.json; and the images of actionlint, zizmor and mermaid-cli,
-# in the FROM of a Dockerfile each in .github/tools/, which the workflow Tests and
-# scripts/diagrams.sh read. test/pins.test.mjs fails on a pin that none of these knows.
+# and Claude Code of the workflow Check the Claude token, in tools/claude-code/, each
+# with its package-lock.json; and the images of actionlint, zizmor and mermaid-cli, in the
+# FROM of a Dockerfile each in tools/, which the workflow Tests and scripts/diagrams.sh
+# read. test/pins.test.mjs fails on a pin that none of these knows. The pins of npm and
+# docker stay out of .github/: GitHub refuses a pull request of Dependabot that changes a
+# file there from any ecosystem but github-actions ("The request contains invalid or
+# unauthorized changes", dependabot/dependabot-core#15237), which test/pins.test.mjs
+# checks as well.
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -19,7 +23,7 @@ updates:
       actions:
         patterns: ["*"]
   - package-ecosystem: npm
-    directories: ["/", "/.github/tools/claude-code"]
+    directories: ["/", "/tools/claude-code"]
     schedule:
       interval: weekly
     cooldown:
@@ -30,7 +34,7 @@ updates:
       tools:
         patterns: ["*"]
   - package-ecosystem: docker
-    directory: /.github/tools
+    directory: /tools
     schedule:
       interval: weekly
     cooldown:
