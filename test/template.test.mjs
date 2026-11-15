@@ -244,7 +244,7 @@ describe("the settings of the template", () => {
 
 // The page and the picture are files of `own`: a copy never gets them through the
 // workflow Template, keeps or deletes them as it was made, and has a README of its own,
-// so they are checked in the template alone, and each only where it is.
+// so they are checked in the template alone, where a missing one fails.
 describe("the social preview of the template", {
   skip: !IN_TEMPLATE && "a control repository has no social preview to check",
 }, () => {
@@ -252,9 +252,7 @@ describe("the social preview of the template", {
   const page = new URL(".github/social-preview.html", root);
   const picture = new URL(".github/social-preview.png", root);
 
-  it("shows the diagram that the README shows", {
-    skip: !existsSync(page) && "the template has no page of a social preview",
-  }, async () => {
+  it("shows the diagram that the README shows", async () => {
     const html = await readFile(page, "utf8");
     const readme = await readFile(new URL("README.md", root), "utf8");
     const pictures = [...html.matchAll(/<img src="\.\.\/([^"]+)"/g)].map(
@@ -269,10 +267,7 @@ describe("the social preview of the template", {
     assert.doesNotMatch(html, /\b(?:src|href)="(?:https?:)?\/\//);
   });
 
-  it("is a picture of 1280 by 640 pixels, as GitHub asks for", {
-    skip:
-      !existsSync(picture) && "the template has no picture of a social preview",
-  }, async () => {
+  it("is a picture of 1280 by 640 pixels, as GitHub asks for", async () => {
     const png = await readFile(picture);
     assert.equal(png.subarray(1, 4).toString("latin1"), "PNG");
     assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [1280, 640]);
