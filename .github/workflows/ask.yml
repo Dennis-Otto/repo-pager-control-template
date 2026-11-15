@@ -61,6 +61,10 @@ on:
         description: The prompt, which points Claude to data/task.md, or for a translation is its task
         type: string
         required: true
+      retry:
+        description: Whether a second try follows when the data of the job or its checkout doesn't arrive
+        type: boolean
+        default: false
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN:
         required: true
@@ -74,6 +78,9 @@ on:
       changed:
         description: Whether a fix changed files
         value: ${{ jobs.ask.outputs.changed }}
+      missing:
+        description: Whether the data of the job or its checkout didn't arrive, so that Claude didn't run
+        value: ${{ jobs.ask.outputs.missing }}
 
 permissions: {}
 
@@ -90,6 +97,7 @@ jobs:
       plan: ${{ steps.claude.outputs.structured_output }}
       base: ${{ steps.target.outputs.sha }}
       changed: ${{ steps.patch.outputs.changed }}
+      missing: ${{ steps.data.outcome == 'failure' || steps.checkout.outcome == 'failure' }}
     steps:
       # In a pull request, the smoke test, the Claude Code action restores its
       # settings files from the base branch with git, so it needs a checkout there.
@@ -102,29 +110,46 @@ jobs:
           sparse-checkout: README.md
           sparse-checkout-cone-mode: false
           persist-credentials: false
+      # The data of the job and its checkout come before Claude, and now and then
+      # don't come: a download from the storage of the artifacts has hung on this
+      # runner for minutes, five tries in a row, while the other runs passed. Each
+      # step has a short limit of its own, and with retry such a miss leaves the job
+      # green with the output missing, so that the workflow Pager tries the job once
+      # more on a new machine; Claude hasn't run, so nothing runs twice. Without
+      # retry, as in the smoke tests, or on the second try, the miss fails the job.
       - name: Get the data of the job
+        id: data
+        continue-on-error: ${{ inputs.retry }}
+        timeout-minutes: 1
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: pager-input
           path: data
       - name: Check out the repository of the job
-        if: inputs.repo != ''
+        id: checkout
+        if: steps.data.outcome == 'success' && inputs.repo != ''
+        continue-on-error: ${{ inputs.retry }}
+        timeout-minutes: 5
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ inputs.repo }}
           path: repo
           persist-credentials: false
+      - name: Say that the job is tried again
+        if: steps.data.outcome == 'failure' || steps.checkout.outcome == 'failure'
+        run: echo "::warning::The data of the job or its checkout didn't arrive, so Claude didn't run; the workflow Pager tries the job once more on a new machine."
       # Claude's tools may write in the checkout, and git runs on what is there after
       # it: the history of git and its settings go where the tools don't reach.
       - name: Keep the history of git out of Claude's reach
         id: target
-        if: inputs.repo != ''
+        if: steps.checkout.outcome == 'success'
         run: |
           set -euo pipefail
           mv repo/.git "$RUNNER_TEMP/repo.git"
           echo "sha=$(git --git-dir="$RUNNER_TEMP/repo.git" rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Ask Claude
         id: claude
+        if: steps.data.outcome == 'success' && (inputs.repo == '' || steps.target.outcome == 'success')
         uses: anthropics/claude-code-action@61a9c274fa7110a66dfafc1bbbced03833eb25fe # v1.0.269
         env:
           DISABLE_TELEMETRY: "1"

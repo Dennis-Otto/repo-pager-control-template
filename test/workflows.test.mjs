@@ -239,6 +239,135 @@ describe("the workflow Pager", () => {
       /^ {10}EFFORT: \$\{\{ needs\.prepare\.outputs\.effort \}\}$/m,
     );
   });
+
+  // The second try of the job of Claude: once, on a new machine, and only when the
+  // first one missed its data or its checkout, so that Claude runs once in all.
+  const jobOf = (name) => {
+    const start = text.indexOf(`\n  ${name}:\n`);
+    assert.notEqual(start, -1, name);
+    const rest = text.slice(start + 1);
+    const end = rest.slice(1).search(/\n {2}(?:# .*\n {2})*[a-z-]+:\n/);
+    return end === -1 ? rest : rest.slice(0, end + 1);
+  };
+  const withOf = (job) =>
+    job
+      .slice(job.indexOf("    with:\n"), job.indexOf("    secrets:\n"))
+      .split("\n")
+      .filter((line) => !/^ {6}(?:# .*|retry: true)$/.test(line));
+
+  it("tries the job of Claude once more, with the same inputs, only after a miss of its data", () => {
+    const ask = jobOf("ask");
+    const again = jobOf("ask-again");
+    assert.equal(
+      text.match(/^ {4}uses: \.\/\.github\/workflows\/ask\.yml /gm).length,
+      2,
+    );
+    assert.match(ask, /^ {6}retry: true$/m);
+    assert.doesNotMatch(again, /retry:/, "the second try is the last one");
+    assert.deepEqual(withOf(again), withOf(ask));
+    assert.match(again, /^ {4}needs: \[prepare, ask\]$/m);
+    assert.match(again, /^ {4}if: needs\.ask\.outputs\.missing == 'true'$/m);
+    assert.match(again, /^ {6}CLAUDE_CODE_OAUTH_TOKEN: /m);
+  });
+
+  it("opens the pull request and answers with the outputs of the try that ran Claude, once", () => {
+    const pull = jobOf("pull-request");
+    const answer = jobOf("answer");
+    assert.match(pull, /^ {4}needs: \[prepare, ask, ask-again\]$/m);
+    assert.match(
+      pull,
+      /^ {4}if: \$\{\{ !cancelled\(\) && \(needs\.ask\.outputs\.missing == 'true' && needs\.ask-again\.result \|\| needs\.ask\.result\) == 'success' && \(needs\.ask-again\.outputs\.changed \|\| needs\.ask\.outputs\.changed\) == 'true' \}\}$/m,
+      "a failed try opens no pull request, even with a change",
+    );
+    for (const output of ["plan", "base"]) {
+      assert.match(
+        pull,
+        new RegExp(
+          `: \\$\\{\\{ needs\\.ask-again\\.outputs\\.${output} \\|\\| needs\\.ask\\.outputs\\.${output} \\}\\}$`,
+          "m",
+        ),
+      );
+    }
+    assert.doesNotMatch(pull, /\{\{ needs\.ask\.outputs\.(?:plan|base) \}\}/);
+    assert.match(
+      answer,
+      /^ {4}needs: \[prepare, ask, ask-again, pull-request\]$/m,
+    );
+    // A miss whose second try didn't run, such as for a cancel, is no success.
+    assert.match(
+      answer,
+      /^ {10}ASK_RESULT: \$\{\{ needs\.ask\.outputs\.missing == 'true' && needs\.ask-again\.result \|\| needs\.ask\.result \}\}$/m,
+    );
+    for (const [name, output] of [
+      ["PLAN", "plan"],
+      ["CHANGED", "changed"],
+    ]) {
+      assert.match(
+        answer,
+        new RegExp(
+          `^ {10}${name}: \\$\\{\\{ needs\\.ask-again\\.outputs\\.${output} \\|\\| needs\\.ask\\.outputs\\.${output} \\}\\}$`,
+          "m",
+        ),
+      );
+    }
+    // One job sends the answer, so that the pager gets one for the job.
+    assert.equal(text.match(/run: node pager\/job\.mjs answer$/gm).length, 1);
+  });
+});
+
+describe("the workflow Ask Claude", () => {
+  const text = read(`${WORKFLOWS}/ask.yml`);
+  const stepOf = (name) => {
+    const start = text.indexOf(`      - name: ${name}\n`);
+    assert.notEqual(start, -1, name);
+    const next = text.indexOf("\n      - name: ", start + 1);
+    return next === -1 ? text.slice(start) : text.slice(start, next);
+  };
+
+  it("gives the data of the job and its checkout a short limit, and leaves a miss to the second try", () => {
+    assert.match(
+      text,
+      /^ {6}retry:\n {8}description: .+\n {8}type: boolean\n {8}default: false$/m,
+    );
+    const data = stepOf("Get the data of the job");
+    assert.match(data, /^ {8}id: data$/m);
+    assert.match(data, /^ {8}timeout-minutes: 1$/m);
+    const checkout = stepOf("Check out the repository of the job");
+    assert.match(checkout, /^ {8}id: checkout$/m);
+    assert.match(checkout, /^ {8}timeout-minutes: 5$/m);
+    assert.match(
+      checkout,
+      /^ {8}if: steps\.data\.outcome == 'success' && inputs\.repo != ''$/m,
+    );
+    for (const step of [data, checkout]) {
+      assert.match(step, /^ {8}continue-on-error: \$\{\{ inputs\.retry \}\}$/m);
+    }
+    assert.match(
+      text,
+      /^ {6}missing: \$\{\{ steps\.data\.outcome == 'failure' \|\| steps\.checkout\.outcome == 'failure' \}\}$/m,
+    );
+    assert.match(
+      text,
+      /^ {6}missing:\n {8}description: .+\n {8}value: \$\{\{ jobs\.ask\.outputs\.missing \}\}$/m,
+    );
+  });
+
+  it("runs Claude only once its data and its checkout arrived", () => {
+    assert.match(
+      stepOf("Keep the history of git out of Claude's reach"),
+      /^ {8}if: steps\.checkout\.outcome == 'success'$/m,
+    );
+    assert.match(
+      stepOf("Ask Claude"),
+      /^ {8}if: steps\.data\.outcome == 'success' && \(inputs\.repo == '' \|\| steps\.target\.outcome == 'success'\)$/m,
+    );
+  });
+
+  it("keeps a miss fatal in the smoke tests, which have no second try", () => {
+    for (const name of ["smoke.yml", "smoke-translate.yml", "smoke-fix.yml"]) {
+      assert.doesNotMatch(read(`${WORKFLOWS}/${name}`), /retry:/, name);
+    }
+  });
 });
 
 describe("the workflow Template", () => {

@@ -9,6 +9,8 @@ name: Pager
 # prepare        checks the event and collects what Claude reads, read-only
 # ask            runs Claude (ask.yml): it only reads, in a fix edits a checkout,
 #                and in a translation has no tool at all
+# ask-again      the same job once more, on a new machine, when the data of the job
+#                or its checkout didn't reach the first try, before Claude ran
 # pull-request   a fix only: makes Claude's change a pull request, with PAGER_FIX_TOKEN
 # answer         checks Claude's answer and sends it to the pager; a translation
 #                that doesn't keep its notes sends nothing
@@ -116,13 +118,41 @@ jobs:
       effort: ${{ needs.prepare.outputs.effort }}
       schema: ${{ needs.prepare.outputs.schema }}
       prompt: ${{ needs.prepare.outputs.prompt }}
+      # A miss of the data or of the checkout leaves this try green, for ask-again.
+      retry: true
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+  # The second and last try, when the first one missed the data of the job or its
+  # checkout, as ask.yml says: Claude hasn't run, so it runs once in all, and the
+  # jobs after this one take the outputs of the try that ran Claude.
+  ask-again:
+    name: Ask Claude again
+    needs: [prepare, ask]
+    if: needs.ask.outputs.missing == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ask.yml # zizmor: ignore[self-repository]
+    with:
+      kind: ${{ needs.prepare.outputs.kind }}
+      repo: ${{ needs.prepare.outputs.repo }}
+      tools: ${{ needs.prepare.outputs.tools }}
+      mode: ${{ needs.prepare.outputs.mode }}
+      turns: ${{ needs.prepare.outputs.turns }}
+      budget: ${{ needs.prepare.outputs.budget }}
+      model: ${{ needs.prepare.outputs.model }}
+      effort: ${{ needs.prepare.outputs.effort }}
+      schema: ${{ needs.prepare.outputs.schema }}
+      prompt: ${{ needs.prepare.outputs.prompt }}
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
   pull-request:
     name: Open the pull request of the fix
-    needs: [prepare, ask]
-    if: needs.ask.outputs.changed == 'true'
+    needs: [prepare, ask, ask-again]
+    # Also when ask-again didn't run, which a job after it otherwise takes for a stop,
+    # but only with a change of the try that ran Claude and succeeded, as ASK_RESULT.
+    if: ${{ !cancelled() && (needs.ask.outputs.missing == 'true' && needs.ask-again.result || needs.ask.result) == 'success' && (needs.ask-again.outputs.changed || needs.ask.outputs.changed) == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -139,7 +169,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ needs.prepare.outputs.repo }}
-          ref: ${{ needs.ask.outputs.base }}
+          ref: ${{ needs.ask-again.outputs.base || needs.ask.outputs.base }}
           path: repo
           persist-credentials: false
       - name: Get the change of the fix
@@ -154,8 +184,8 @@ jobs:
         id: pull
         env:
           JOB: ${{ needs.prepare.outputs.job }}
-          PLAN: ${{ needs.ask.outputs.plan }}
-          BASE: ${{ needs.ask.outputs.base }}
+          PLAN: ${{ needs.ask-again.outputs.plan || needs.ask.outputs.plan }}
+          BASE: ${{ needs.ask-again.outputs.base || needs.ask.outputs.base }}
           PAGER_FIX_TOKEN: ${{ secrets.PAGER_FIX_TOKEN }}
           # A fix changes no workflow or action unless the owner sets it to true.
           PAGER_FIX_WORKFLOWS: ${{ vars.PAGER_FIX_WORKFLOWS }}
@@ -165,7 +195,7 @@ jobs:
 
   answer:
     name: Answer the pager
-    needs: [prepare, ask, pull-request]
+    needs: [prepare, ask, ask-again, pull-request]
     # Also when Claude failed: the pager then says why, and brings its button back.
     if: always() && needs.prepare.result == 'success'
     runs-on: ubuntu-24.04
@@ -191,9 +221,10 @@ jobs:
           JOB: ${{ needs.prepare.outputs.job }}
           PREPARE_ERROR: ${{ needs.prepare.outputs.error }}
           EFFORT: ${{ needs.prepare.outputs.effort }}
-          ASK_RESULT: ${{ needs.ask.result }}
-          PLAN: ${{ needs.ask.outputs.plan }}
-          CHANGED: ${{ needs.ask.outputs.changed }}
+          # The try that ran Claude: the second one, when the first missed its data.
+          ASK_RESULT: ${{ needs.ask.outputs.missing == 'true' && needs.ask-again.result || needs.ask.result }}
+          PLAN: ${{ needs.ask-again.outputs.plan || needs.ask.outputs.plan }}
+          CHANGED: ${{ needs.ask-again.outputs.changed || needs.ask.outputs.changed }}
           PULL_URL: ${{ needs.pull-request.outputs.url }}
           PULL_ERROR: ${{ needs.pull-request.outputs.error }}
           PAGER_TRANSCRIPT: transcript
