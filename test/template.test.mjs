@@ -29,6 +29,7 @@ import {
   WORK,
 } from "../pager/template.mjs";
 import { json, Net } from "./fake.mjs";
+import { IN_TEMPLATE } from "./where.mjs";
 
 const TEMPLATE = "Dennis-Otto/repo-pager-control-template";
 const HOME = "monalisa/repo-pager-control";
@@ -241,16 +242,22 @@ describe("the settings of the template", () => {
   });
 });
 
-describe("the social preview of the template", () => {
+// The page and the picture are files of `own`: a copy never gets them through the
+// workflow Template, keeps or deletes them as it was made, and has a README of its own,
+// so they are checked in the template alone, and each only where it is.
+describe("the social preview of the template", {
+  skip: !IN_TEMPLATE && "a control repository has no social preview to check",
+}, () => {
   const root = new URL("../", import.meta.url);
+  const page = new URL(".github/social-preview.html", root);
+  const picture = new URL(".github/social-preview.png", root);
 
-  it("shows the diagram that the README shows", async () => {
-    const page = await readFile(
-      new URL(".github/social-preview.html", root),
-      "utf8",
-    );
+  it("shows the diagram that the README shows", {
+    skip: !existsSync(page) && "the template has no page of a social preview",
+  }, async () => {
+    const html = await readFile(page, "utf8");
     const readme = await readFile(new URL("README.md", root), "utf8");
-    const pictures = [...page.matchAll(/<img src="\.\.\/([^"]+)"/g)].map(
+    const pictures = [...html.matchAll(/<img src="\.\.\/([^"]+)"/g)].map(
       (match) => match[1],
     );
     assert.deepEqual(pictures, [
@@ -259,11 +266,14 @@ describe("the social preview of the template", () => {
     assert.ok(existsSync(new URL(pictures[0], root)));
     assert.ok(readme.includes(`srcset="${pictures[0]}"`));
     // Nothing from the network, so that the picture is the same offline.
-    assert.doesNotMatch(page, /\b(?:src|href)="(?:https?:)?\/\//);
+    assert.doesNotMatch(html, /\b(?:src|href)="(?:https?:)?\/\//);
   });
 
-  it("is a picture of 1280 by 640 pixels, as GitHub asks for", async () => {
-    const png = await readFile(new URL(".github/social-preview.png", root));
+  it("is a picture of 1280 by 640 pixels, as GitHub asks for", {
+    skip:
+      !existsSync(picture) && "the template has no picture of a social preview",
+  }, async () => {
+    const png = await readFile(picture);
     assert.equal(png.subarray(1, 4).toString("latin1"), "PNG");
     assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [1280, 640]);
   });

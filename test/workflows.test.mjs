@@ -7,15 +7,14 @@
 // workflow Pager reads today's runs of its own workflow for PAGER_DAILY_RUNS, and the
 // workflow Template reads the checks of its pull request for `merge`.
 import assert from "node:assert/strict";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, it } from "node:test";
-import { fileURLToPath } from "node:url";
 
 import { BY_ITSELF } from "../pager/prepare.mjs";
 import { WAIT } from "../pager/template.mjs";
+import { IN_TEMPLATE, ROOT } from "./where.mjs";
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const WORKFLOWS = ".github/workflows";
 // The one workflow whose job writes, and what it may write.
 const MERGE = "dependabot.yml";
@@ -45,12 +44,6 @@ const workflows = readdirSync(join(ROOT, WORKFLOWS))
   .filter((name) => /\.ya?ml$/.test(name))
   .map((name) => ({ name, text: read(`${WORKFLOWS}/${name}`) }));
 
-// As in test/pins.test.mjs: the template, not a control repository, which may add
-// workflows of its own and sets its own policy.
-const template =
-  JSON.parse(read(".github/template.json")).commit === "" &&
-  existsSync(join(ROOT, ".github/dependabot.yml"));
-
 /** Each `uses:` of a text that runs an action or a workflow of another repository. */
 function usesOf(text) {
   return [...text.matchAll(/^\s*(?:-\s+)?uses:\s*(\S+)/gm)]
@@ -58,8 +51,10 @@ function usesOf(text) {
     .filter((target) => !target.startsWith("./"));
 }
 
+// As in test/pins.test.mjs: the template, not a control repository, which may add
+// workflows of its own and sets its own policy.
 describe("the workflows of the template", {
-  skip: !template && "a control repository sets its own policy",
+  skip: !IN_TEMPLATE && "a control repository sets its own policy",
 }, () => {
   it("run only GitHub's own actions and those that the policy allows, each pinned to a commit", () => {
     const refused = workflows.flatMap(({ name, text }) =>

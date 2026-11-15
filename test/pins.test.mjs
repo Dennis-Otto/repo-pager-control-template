@@ -7,9 +7,9 @@ import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
-import { fileURLToPath } from "node:url";
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+import { IN_TEMPLATE, ROOT } from "./where.mjs";
+
 const DEPENDABOT = ".github/dependabot.yml";
 // The folders that hold no file of the repository.
 const SKIPPED = new Set([".git", "node_modules", "coverage", "pager-input"]);
@@ -196,14 +196,10 @@ describe("finding a pinned tool", () => {
 // The template keeps the pins; a control repository takes them from it through the
 // workflow Template, deletes its dependabot.yml, as the README says, or keeps one of
 // its own, and has nothing of this to check.
-const template =
-  JSON.parse(read(".github/template.json")).commit === "" &&
-  existsSync(join(ROOT, DEPENDABOT));
-
 describe("the pins of this repository", {
-  skip: !template && "a control repository takes its pins from the template",
+  skip: !IN_TEMPLATE && "a control repository takes its pins from the template",
 }, () => {
-  const updaters = template ? updatersOf(read(DEPENDABOT)) : new Map();
+  const updaters = IN_TEMPLATE ? updatersOf(read(DEPENDABOT)) : new Map();
   const reads = (ecosystem, folder) =>
     updaters.get(ecosystem)?.has(folder) ?? false;
   const runs = [...filesBelow(".github/workflows"), ...filesBelow("scripts")];
