@@ -16,11 +16,18 @@ What the jobs give back shows in Telegram. A draft of a reply in your voice, whi
   <img src="https://raw.githubusercontent.com/Dennis-Otto/repo-pager/main/docs/images/screenshots/chat-contribution-en.png" width="100%" alt="A new issue in the topic of its contribution: sam-lee reports that the sync of paperless-sync stops when a tag has a slash, quoted in the message, with the buttons Draft a reply, Assistant again, Later and Ignore. A minute after Draft a reply, the same message, edited, shows the draft of a reply in the maintainer's voice, with the buttons Send, Edit, Later and Ignore">
 </picture>
 
-A workflow that fails on `main` brings 🛠 **Start fix**, whose job here has Claude change a checkout and opens the pull request of the fix:
+A workflow that fails on `main` brings 🛠 **Start fix**, whose job here has Claude change a checkout and opens the pull request of the fix; its note comes back in a new message of the alarm, with the link to the pull request:
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Dennis-Otto/repo-pager/main/docs/images/screenshots/chat-alarm-en.dark.png">
-  <img src="https://raw.githubusercontent.com/Dennis-Otto/repo-pager/main/docs/images/screenshots/chat-alarm-en.png" width="100%" alt="A message of Repo Pager in Telegram, in the topic 🚨 repo-blueprint needs you: Dennis-Otto/repo-blueprint needs you, since the release fails and Socket Security fails on main, with the buttons Rerun and Start fix, Later and Ignore">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Dennis-Otto/repo-pager/main/docs/images/screenshots/chat-fix-en.dark.png">
+  <img src="https://raw.githubusercontent.com/Dennis-Otto/repo-pager/main/docs/images/screenshots/chat-fix-en.png" width="100%" alt="The topic 🚨 repo-blueprint needs you in Telegram: the message of the alarm with the buttons Rerun and Start fix, Later and Ignore, and twelve minutes after Start fix a new message of the alarm, which says that a fix is under way in the control repository, with the note of the fix: the lock file pinned tar 6.2.0, which Socket Security flags, the fix moves it to 7.4.3, and the link to its pull request Dennis-Otto/repo-blueprint/pull/482, then the model, the effort and the tokens of the run, with the buttons Later and Ignore">
+</picture>
+
+A text that you write to the bot gets its answer from the job of a free text here, and an action that the answer proposes waits for your ✅ **Confirm**:
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Dennis-Otto/repo-pager/main/docs/images/screenshots/chat-answer-en.dark.png">
+  <img src="https://raw.githubusercontent.com/Dennis-Otto/repo-pager/main/docs/images/screenshots/chat-answer-en.png" width="100%" alt="The topic 📦 paperless-sync 1.7.0 in Telegram: the message of the release with the buttons Merge, Later and Ignore, below it the maintainer's question whether 1.7.0 needs anything from those who update from 1.6, with the reaction 👍, and the answer of the control repository: no, renamed tags follow by themselves and every check is green, then Merge 1.7.0 with the link to Dennis-Otto/paperless-sync#312, the model, the effort and the tokens of the run, and the one button Confirm">
 </picture>
 
 A release brings its notes in English; while your pager speaks another language, the job of a translation here words them in yours, and the message of the release changes in place:
@@ -30,7 +37,7 @@ A release brings its notes in English; while your pager speaks another language,
   <img src="https://raw.githubusercontent.com/Dennis-Otto/repo-pager/main/docs/images/screenshots/chat-release-de.png" width="100%" alt="The message of the release 1.7.0 of Dennis-Otto/paperless-sync in its topic, in a pager that speaks German: its notes under Neue Funktionen, translated into German with their references #305 and #309, and that every check is green and Mergen publishes it, with the buttons Mergen, Später and Ignorieren">
 </picture>
 
-The three pictures come from the [screenshots of Repo Pager](https://github.com/Dennis-Otto/repo-pager/blob/main/scripts/screenshots.sh), which renders them from the texts of the pager; [how it works](https://github.com/Dennis-Otto/repo-pager/blob/main/docs/how-it-works.md) shows the rest.
+The four pictures, one for each job of Claude here, come from the [screenshots of Repo Pager](https://github.com/Dennis-Otto/repo-pager/blob/main/scripts/screenshots.sh), which renders them from the texts of the pager; [how it works](https://github.com/Dennis-Otto/repo-pager/blob/main/docs/how-it-works.md) shows the rest.
 
 ## What you need
 
