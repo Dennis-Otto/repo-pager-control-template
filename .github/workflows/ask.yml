@@ -125,7 +125,7 @@ jobs:
           echo "sha=$(git --git-dir="$RUNNER_TEMP/repo.git" rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Ask Claude
         id: claude
-        uses: anthropics/claude-code-action@d535f5172dec02b204866b393d6b20b9b2aaf98d # v1.0.266
+        uses: anthropics/claude-code-action@61a9c274fa7110a66dfafc1bbbced03833eb25fe # v1.0.269
         env:
           DISABLE_TELEMETRY: "1"
           DISABLE_ERROR_REPORTING: "1"
