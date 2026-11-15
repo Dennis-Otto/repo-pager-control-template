@@ -4,7 +4,7 @@ name: Tests
 # lint and format of the code, and the checks of the workflows: actionlint, and
 # zizmor for the ways a workflow gets attacked. The tools run from images pinned by
 # their digest, so that no action of a third party runs here: each image is the FROM
-# of its Dockerfile in .github/tools/, which Dependabot keeps current, as it keeps
+# of its Dockerfile in tools/, which Dependabot keeps current, as it keeps
 # Biome current in package.json. The diagrams are checked without Docker: no
 # ```mermaid block in the Markdown, both pictures of every source that a page shows
 # and a source for every picture. It doesn't see a picture that is older than its
@@ -49,10 +49,10 @@ jobs:
       - name: Lint the workflows
         if: ${{ !cancelled() }}
         run: |
-          image="$(awk '$1 == "FROM" { print $2; exit }' .github/tools/actionlint.Dockerfile)"
+          image="$(awk '$1 == "FROM" { print $2; exit }' tools/actionlint.Dockerfile)"
           docker run --rm --volume "$PWD:/repo" --workdir /repo "$image"
       - name: Audit the workflows
         if: ${{ !cancelled() }}
         run: |
-          image="$(awk '$1 == "FROM" { print $2; exit }' .github/tools/zizmor.Dockerfile)"
+          image="$(awk '$1 == "FROM" { print $2; exit }' tools/zizmor.Dockerfile)"
           docker run --rm --volume "$PWD:/repo" --workdir /repo "$image" --offline --format github .github/workflows

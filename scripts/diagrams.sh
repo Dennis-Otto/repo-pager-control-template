@@ -26,7 +26,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 # The command line of mermaid with its Chromium: the FROM of this Dockerfile, which
 # Dependabot keeps current.
-dockerfile=.github/tools/mermaid-cli.Dockerfile
+dockerfile=tools/mermaid-cli.Dockerfile
 sources=docs/diagrams
 pictures=docs/images/diagrams
 # The tags of HTML in labels other than <br>, as python3 blueprint.py diagrams extract
