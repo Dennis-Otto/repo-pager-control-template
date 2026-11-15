@@ -17,6 +17,10 @@ name: Ask Claude
 #   its notes in its prompt, between lines that no note can hold.
 # - The job has the read-only token of the workflow and no secret that writes: the
 #   jobs after it, on other machines, check Claude's answer and post it.
+# - The data of the job comes in its inputs and the change of a fix goes back in its
+#   outputs, packed as pager/pack.mjs says, never through the storage of the
+#   artifacts, which this runner now and then doesn't reach: the inputs and the
+#   outputs travel with the job itself. The pack reaches a step only through env:.
 
 on:
   workflow_call:
@@ -61,6 +65,26 @@ on:
         description: The prompt, which points Claude to data/task.md, or for a translation is its task
         type: string
         required: true
+      pack1:
+        description: Part 1 of the data of the job, packed by the job prepare as pager/pack.mjs says
+        type: string
+        default: ""
+      pack2:
+        description: Part 2 of the data of the job, packed by the job prepare as pager/pack.mjs says
+        type: string
+        default: ""
+      pack3:
+        description: Part 3 of the data of the job, packed by the job prepare as pager/pack.mjs says
+        type: string
+        default: ""
+      pack4:
+        description: Part 4 of the data of the job, packed by the job prepare as pager/pack.mjs says
+        type: string
+        default: ""
+      pack_sha256:
+        description: The sha256 of the pack of the data of the job, which the job checks before it unpacks it
+        type: string
+        required: true
       retry:
         description: Whether a second try follows when the data of the job or its checkout doesn't arrive
         type: boolean
@@ -81,6 +105,21 @@ on:
       missing:
         description: Whether the data of the job or its checkout didn't arrive, so that Claude didn't run
         value: ${{ jobs.ask.outputs.missing }}
+      patch1:
+        description: Part 1 of the change of a fix, packed as pager/pack.mjs says
+        value: ${{ jobs.ask.outputs.patch1 }}
+      patch2:
+        description: Part 2 of the change of a fix, packed as pager/pack.mjs says
+        value: ${{ jobs.ask.outputs.patch2 }}
+      patch3:
+        description: Part 3 of the change of a fix, packed as pager/pack.mjs says
+        value: ${{ jobs.ask.outputs.patch3 }}
+      patch_sha256:
+        description: The sha256 of the pack of the change, or none when it was too large to hand over
+        value: ${{ jobs.ask.outputs.patch_sha256 }}
+      patch_size:
+        description: The characters of the pack of the change
+        value: ${{ jobs.ask.outputs.patch_size }}
 
 permissions: {}
 
@@ -98,6 +137,11 @@ jobs:
       base: ${{ steps.target.outputs.sha }}
       changed: ${{ steps.patch.outputs.changed }}
       missing: ${{ steps.data.outcome == 'failure' || steps.checkout.outcome == 'failure' }}
+      patch1: ${{ steps.patch.outputs.patch1 }}
+      patch2: ${{ steps.patch.outputs.patch2 }}
+      patch3: ${{ steps.patch.outputs.patch3 }}
+      patch_sha256: ${{ steps.patch.outputs.patch_sha256 }}
+      patch_size: ${{ steps.patch.outputs.patch_size }}
     steps:
       # In a pull request, the smoke test, the Claude Code action restores its
       # settings files from the base branch with git, so it needs a checkout there.
@@ -110,21 +154,34 @@ jobs:
           sparse-checkout: README.md
           sparse-checkout-cone-mode: false
           persist-credentials: false
-      # The data of the job and its checkout come before Claude, and now and then
-      # don't come: a download from the storage of the artifacts has hung on this
-      # runner for minutes, five tries in a row, while the other runs passed. Each
-      # step has a short limit of its own, and with retry such a miss leaves the job
-      # green with the output missing, so that the workflow Pager tries the job once
-      # more on a new machine; Claude hasn't run, so nothing runs twice. Without
-      # retry, as in the smoke tests, or on the second try, the miss fails the job.
+      # The data of the job and its checkout come before Claude, and may not come:
+      # a pack that doesn't match its sha256, such as one with an output that GitHub
+      # skipped, or a checkout that fails. Each step has a short limit of its own,
+      # and with retry such a miss leaves the job green with the output missing, so
+      # that the workflow Pager tries the job once more on a new machine; Claude
+      # hasn't run, so nothing runs twice. Without retry, as in the smoke tests, or
+      # on the second try, the miss fails the job. The pack comes through env:
+      # alone, since it holds the text of strangers, and tar writes into data/ only.
       - name: Get the data of the job
         id: data
         continue-on-error: ${{ inputs.retry }}
         timeout-minutes: 1
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: pager-input
-          path: data
+        env:
+          PACK1: ${{ inputs.pack1 }}
+          PACK2: ${{ inputs.pack2 }}
+          PACK3: ${{ inputs.pack3 }}
+          PACK4: ${{ inputs.pack4 }}
+          PACK_SHA256: ${{ inputs.pack_sha256 }}
+        run: |
+          set -euo pipefail
+          pack="$RUNNER_TEMP/pager-input.tar.gz"
+          printf '%s' "$PACK1$PACK2$PACK3$PACK4" | base64 --decode > "$pack"
+          if ! printf '%s  %s\n' "$PACK_SHA256" "$pack" | sha256sum --check --status; then
+            echo "::error::The data of the job didn't arrive whole: ${#PACK1}, ${#PACK2}, ${#PACK3} and ${#PACK4} characters, whose sha256 isn't that of the job prepare."
+            exit 1
+          fi
+          mkdir data
+          tar --extract --gzip --file "$pack" --directory data --no-same-owner --no-same-permissions --touch
       - name: Check out the repository of the job
         id: checkout
         if: steps.data.outcome == 'success' && inputs.repo != ''
@@ -190,36 +247,48 @@ jobs:
             --json-schema '${{ inputs.schema }}'
       # The transcript of the run, for the answer job, which counts what it took,
       # and for the maintainer, who may look at what Claude read and did.
+      # It goes to the storage of the artifacts, so its upload can't fail the job:
+      # without it, the answer has no usage, and Claude's answer still goes.
       - name: Keep the transcript
         if: always() && steps.claude.outputs.execution_file != ''
+        continue-on-error: true
+        timeout-minutes: 2
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: pager-transcript
           path: ${{ steps.claude.outputs.execution_file }}
           retention-days: 3
       # git runs with the history from before, without hooks or a monitor of the
-      # file system, so that nothing that Claude wrote runs.
+      # file system, so that nothing that Claude wrote runs. The change goes back in
+      # the outputs, a patch in gzip in base64, in chunks of 100,000 characters, as
+      # PACK of pager/pack.mjs says; one of more than three chunks goes without its
+      # sha256, and the job pull-request answers that it is too large to hand over.
       - name: Collect the change of the fix
         id: patch
         if: inputs.kind == 'fix' && steps.claude.outcome == 'success'
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/fix"
           git() {
             command git --git-dir="$RUNNER_TEMP/repo.git" --work-tree=repo \
               -c core.hooksPath=/dev/null -c core.fsmonitor=false "$@"
           }
           git add --all
-          git diff --cached --binary > "$RUNNER_TEMP/fix/fix.patch"
-          if [ -s "$RUNNER_TEMP/fix/fix.patch" ]; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
+          git diff --cached --binary > "$RUNNER_TEMP/fix.patch"
+          if [ ! -s "$RUNNER_TEMP/fix.patch" ]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
-      - name: Hand over the change
-        if: steps.patch.outputs.changed == 'true'
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: pager-fix
-          path: ${{ runner.temp }}/fix/fix.patch
-          retention-days: 3
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          gzip -9 -n -c "$RUNNER_TEMP/fix.patch" > "$RUNNER_TEMP/fix.patch.gz"
+          packed=$(base64 -w 0 "$RUNNER_TEMP/fix.patch.gz")
+          chunk=100000
+          chunks=3
+          echo "patch_size=${#packed}" >> "$GITHUB_OUTPUT"
+          if [ "${#packed}" -gt $((chunk * chunks)) ]; then
+            echo "::warning::The change of the fix is too large to hand over: ${#packed} characters packed."
+            exit 0
+          fi
+          for index in $(seq 1 "$chunks"); do
+            echo "patch$index=${packed:$(((index - 1) * chunk)):$chunk}" >> "$GITHUB_OUTPUT"
+          done
+          echo "patch_sha256=$(sha256sum "$RUNNER_TEMP/fix.patch.gz" | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"

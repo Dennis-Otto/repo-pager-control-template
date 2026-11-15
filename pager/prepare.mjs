@@ -16,6 +16,7 @@ import {
   task,
 } from "./core.mjs";
 import { GitHubError } from "./github.mjs";
+import { dataOutputs, PACK, packOf, sizeOf } from "./pack.mjs";
 
 /**
  * The most of each text that Claude reads, in characters; of a log, its lines and
@@ -592,11 +593,13 @@ async function jobsOf(api, repo, url, details) {
  * that it names. What can't be read says why in `unread`, with the status of
  * GitHub: that of the entry, or that of a job whose log is missing. What GitHub
  * doesn't show the token of the workflow, such as code-scanning alerts, stays its
- * label and address.
+ * label and address. `full` keeps each whole log, from which the job prepare cuts
+ * a shorter part when the data doesn't fit its pack.
  */
 export async function failures(api, job) {
   const entries = [];
   const logs = {};
+  const full = {};
   for (const entry of job.entries) {
     const details = { label: entry.label, url: entry.url };
     entries.push(details);
@@ -631,6 +634,7 @@ export async function failures(api, job) {
         );
         read.log = `logs/${Object.keys(logs).length + 1}-${each.id}.txt`;
         logs[read.log] = excerpt(log);
+        full[read.log] = log;
       } catch (error) {
         if (!(error instanceof GitHubError)) {
           throw error;
@@ -639,7 +643,7 @@ export async function failures(api, job) {
       }
     }
   }
-  return { entries, logs };
+  return { entries, logs, full };
 }
 
 /**
@@ -719,10 +723,101 @@ export async function held(job, api, { paused, daily, ...today }) {
     : `today's runs that start by themselves, drafts of discussions and translations, reached PAGER_DAILY_RUNS, ${limit}; the count starts again at 00:00 UTC`;
 }
 
-/** Collect what Claude reads for a job, and why it can't run without it, if so. */
+/** A text that the job prepare never halves, since halving it gains too little. */
+const SHORTEST = 200;
+
+/** The folders of the data of a job, which are there even when empty. */
+const FOLDERS = ["logs"];
+
+/**
+ * Leave out the older half of the comments of a thread, with their replies in a
+ * discussion; the comment that the reply answers stays, and `omitted` tells Claude
+ * how many comments it doesn't see.
+ */
+function fewerComments(shown) {
+  const count = shown.comments.length;
+  if (count === 0) {
+    return false;
+  }
+  const dropped = Math.ceil(count / 2);
+  shown.comments = shown.comments.slice(dropped);
+  shown.omitted = { comments: (shown.omitted?.comments ?? 0) + dropped };
+  return true;
+}
+
+/** Halve each text under `key` that is longer than SHORTEST; false if none is. */
+function halve(holders, key) {
+  let cut = false;
+  for (const holder of holders) {
+    const text = holder[key];
+    if (text.length > SHORTEST) {
+      holder[key] = `${text.slice(0, Math.floor(text.length / 2))}…`;
+      cut = true;
+    }
+  }
+  return cut;
+}
+
+/**
+ * The cuts of a thread, for a draft whose data doesn't fit its pack: the older
+ * comments, then the patches of a pull request. `write` writes the thread anew.
+ */
+function threadCuts(shown, write) {
+  const patches = shown.pull?.files ?? [];
+  return [
+    {
+      size: () => JSON.stringify(shown.comments).length,
+      cut: () => fewerComments(shown) && write(),
+    },
+    {
+      size: () => JSON.stringify(patches.map((file) => file.patch)).length,
+      cut: () => halve(patches, "patch") && write(),
+    },
+  ];
+}
+
+/**
+ * The cuts of a fix: the part of each log, in half the lines, read again from the
+ * whole log so that its errors stay; then the texts of the issues of bots.
+ */
+function fixCuts(found, files, write) {
+  let lines = READ.log;
+  const issues = found.entries.flatMap((entry) =>
+    entry.issue === undefined ? [] : [entry.issue],
+  );
+  return [
+    {
+      size: () =>
+        Object.keys(found.full).reduce(
+          (sum, name) => sum + files[name].length,
+          0,
+        ),
+      cut: () => {
+        if (lines === 1) {
+          return false;
+        }
+        lines = Math.floor(lines / 2);
+        for (const [name, log] of Object.entries(found.full)) {
+          files[name] = excerpt(log, lines);
+        }
+        return true;
+      },
+    },
+    {
+      size: () => JSON.stringify(issues.map((issue) => issue.body)).length,
+      cut: () => halve(issues, "body") && write(),
+    },
+  ];
+}
+
+/**
+ * Collect what Claude reads for a job, and why it can't run without it, if so, with
+ * the cuts that make it smaller when it doesn't fit its pack.
+ */
 async function collect(job, { api, owner, read }) {
   const files = {};
   let error = "";
+  let cuts = [];
   if (job.kind === "text") {
     files["text.txt"] = job.text;
     if (job.reply !== "") {
@@ -747,7 +842,13 @@ async function collect(job, { api, owner, read }) {
     // A draft without its thread is none: the pager hears why, and brings back
     // its button, instead of waiting for an answer that never comes.
     try {
-      files["thread.json"] = JSON.stringify(await thread(api, job), null, 1);
+      const shown = await thread(api, job);
+      const write = () => {
+        files["thread.json"] = JSON.stringify(shown, null, 1);
+        return true;
+      };
+      write();
+      cuts = threadCuts(shown, write);
     } catch (failure) {
       if (!(failure instanceof GitHubError)) {
         throw failure;
@@ -757,10 +858,33 @@ async function collect(job, { api, owner, read }) {
     files["voice.md"] = await read("voice.md");
   } else if (job.kind === "fix") {
     const found = await failures(api, job);
-    files["failures.json"] = JSON.stringify(found.entries, null, 1);
+    const write = () => {
+      files["failures.json"] = JSON.stringify(found.entries, null, 1);
+      return true;
+    };
+    write();
     Object.assign(files, found.logs);
+    cuts = fixCuts(found, files, write);
   }
-  return { files, error };
+  return { files, error, cuts };
+}
+
+/**
+ * The pack of the data of a job within `room` characters: while it is larger, the
+ * cut of the largest part that still cuts makes it smaller, and it is packed anew.
+ * Returns the pack, or null when every cut is spent and it is still too large.
+ */
+export function fit(files, cuts, room) {
+  for (;;) {
+    const pack = packOf(files, FOLDERS);
+    if (pack.text.length <= room) {
+      return pack;
+    }
+    const sorted = [...cuts].sort((a, b) => b.size() - a.size());
+    if (!sorted.some((each) => each.cut())) {
+      return null;
+    }
+  }
 }
 
 /**
@@ -770,7 +894,9 @@ async function collect(job, { api, owner, read }) {
  * collects nothing, and its error says why. Tuning holds PAGER_MODEL and
  * PAGER_LIMITS, as limitsOf of pager/core.mjs reads them: one that doesn't check
  * out holds the job in the same way, and `settings` of the result names it, for an
- * error of the run as well.
+ * error of the run as well. The outputs hand on the data packed, all of them within
+ * `budget` bytes as GitHub counts them; a job whose data no cut makes fit doesn't
+ * run Claude, and its error says why.
  */
 export async function prepare({
   eventName,
@@ -782,6 +908,7 @@ export async function prepare({
   workflows = false,
   hold,
   tuning = {},
+  budget = PACK.outputs,
 }) {
   const job = readJob(eventName, event, owner);
   let limits = LIMITS;
@@ -798,20 +925,18 @@ export async function prepare({
   if (why === "" && hold !== undefined) {
     why = await held(job, api, hold);
   }
-  const { files, error } =
+  const collected =
     why === ""
       ? await collect(job, { api, owner, read })
-      : { files: {}, error: why };
+      : { files: {}, error: why, cuts: [] };
+  const { files, cuts } = collected;
+  let { error } = collected;
   // A translation has no tool to read a file with: its task holds its notes, between
   // lines that no note can hold, and is its prompt; data/task.md keeps it for the
   // maintainer, who may look at what Claude got.
   const data = `notes-${randomBytes(8).toString("hex")}`;
   files["task.md"] = task(job, Object.keys(files).sort(), data, workflows);
   files["rules.md"] = await read("rules.md");
-  await mkdir(join(out, "logs"), { recursive: true });
-  for (const [name, content] of Object.entries(files)) {
-    await writeFile(join(out, name), content);
-  }
   // The outputs name the job for the jobs after this one. The thing of a text is
   // data for Claude alone; the item of a draft, a fix or a translation is the thing
   // that its answer goes back to, so it stays. A translation reads no checkout: its
@@ -819,17 +944,43 @@ export async function prepare({
   const { text: _text, reply: _reply, item, ...rest } = job;
   const named = job.kind === "text" ? rest : { ...rest, item };
   const translates = job.kind === "translate";
+  const outputs = {
+    job: JSON.stringify(named),
+    kind: job.kind,
+    repo: translates ? "" : (job.repo ?? ""),
+    ...limits[job.kind],
+    schema: JSON.stringify(schema(job.kind, job.lines?.length)),
+    prompt: translates ? files["task.md"] : PROMPT,
+    error,
+  };
+  // The data reaches the job of Claude in the outputs, packed, within what the
+  // other outputs leave of the budget, an error of TOO_LARGE counted besides.
+  const others = sizeOf({
+    ...outputs,
+    error: `${error}${TOO_LARGE}`,
+    ...dataOutputs({ text: "", sha256: "0".repeat(64) }),
+  });
+  const room = Math.min(
+    PACK.data * PACK.chunk,
+    Math.floor((budget - others) / 2),
+  );
+  let pack = fit(files, cuts, room);
+  if (pack === null) {
+    pack = packOf({}, FOLDERS);
+    error = TOO_LARGE;
+  }
+  // The folder that the maintainer may look at holds what Claude gets.
+  await mkdir(join(out, "logs"), { recursive: true });
+  for (const [name, content] of Object.entries(files)) {
+    await writeFile(join(out, name), content);
+  }
   return {
     job,
     settings,
-    outputs: {
-      job: JSON.stringify(named),
-      kind: job.kind,
-      repo: translates ? "" : (job.repo ?? ""),
-      ...limits[job.kind],
-      schema: JSON.stringify(schema(job.kind, job.lines?.length)),
-      prompt: translates ? files["task.md"] : PROMPT,
-      error,
-    },
+    outputs: { ...outputs, error, ...dataOutputs(pack) },
   };
 }
+
+/** Why a job whose data no cut makes fit its pack doesn't run. */
+const TOO_LARGE =
+  "the data of the job is too large to hand over to Claude, even with its older comments, its patches and its logs cut";

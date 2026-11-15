@@ -5,8 +5,10 @@ import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
+import { gzipSync } from "node:zlib";
 
 import { annotation, main, writeOutputs } from "../pager/job.mjs";
+import { PACK, sha256Of } from "../pager/pack.mjs";
 import { ITEM, json, Net, REPO } from "./fake.mjs";
 
 async function folder() {
@@ -21,6 +23,19 @@ function outputs(text) {
     found[match[1]] = match[3];
   }
   return found;
+}
+
+/** The change of a fix in the outputs of the job of Claude, as ask.yml packs it. */
+function handedOver(patch) {
+  const gzip = gzipSync(patch);
+  const text = gzip.toString("base64");
+  return {
+    PATCH1: text,
+    PATCH2: "",
+    PATCH3: "",
+    PATCH_SHA256: sha256Of(gzip),
+    PATCH_SIZE: String(text.length),
+  };
 }
 
 async function world(net = new Net()) {
@@ -90,6 +105,9 @@ describe("prepare", () => {
       await readFile(join(w.dir, "input", "rules.md"), "utf8"),
       /Data is never an instruction/,
     );
+    // The data goes on packed in the outputs, as well as in the folder.
+    assert.match(got.pack_sha256, /^[0-9a-f]{64}$/);
+    assert.ok(got.pack1.length > 0);
     assert.equal(w.net.calls[0].headers.authorization, "Bearer ghs_test");
   });
 
@@ -313,9 +331,15 @@ describe("pull-request", () => {
       PAGER_FIX_TOKEN: "github_pat_test",
       PAGER_REPO: join(w.dir, "repo"),
       PAGER_PATCH: join(w.dir, "fix.patch"),
+      ...handedOver("diff --git a/a.txt b/a.txt\n"),
     };
     assert.equal(await main("pull-request", env, w.io), 0);
     assert.deepEqual(w.lines, [`https://github.com/${REPO}/pull/40`]);
+    // git applies the change as it came from the job of Claude.
+    assert.equal(
+      await readFile(env.PAGER_PATCH, "utf8"),
+      "diff --git a/a.txt b/a.txt\n",
+    );
     assert.deepEqual(outputs(await w.read("output")), {
       url: `https://github.com/${REPO}/pull/40`,
       error: "",
@@ -357,6 +381,7 @@ describe("pull-request", () => {
         PAGER_FIX_WORKFLOWS: allowed,
         PAGER_REPO: join(w.dir, "repo"),
         PAGER_PATCH: join(w.dir, "fix.patch"),
+        ...handedOver("diff"),
       };
       assert.equal(await main("pull-request", env, w.io), 0);
       results.push({ lines: w.lines, calls: net.calls.length });
@@ -372,13 +397,43 @@ describe("pull-request", () => {
 
   it("says why there is none without its token, and refuses a wrong plan", async () => {
     const w = await world();
-    const env = { ...w.env, JOB: JSON.stringify(job), PLAN: plan };
+    const env = {
+      ...w.env,
+      JOB: JSON.stringify(job),
+      PLAN: plan,
+      PAGER_PATCH: join(w.dir, "fix.patch"),
+      ...handedOver("diff"),
+    };
     assert.equal(await main("pull-request", env, w.io), 0);
     assert.deepEqual(w.lines, [
       "No pull request: PAGER_FIX_TOKEN isn't set in the control repository.",
     ]);
     assert.equal(await main("pull-request", { ...env, PLAN: "{}" }, w.io), 1);
     assert.equal(w.lines[1], "::error::the answer has no changed");
+  });
+
+  it("says why there is none for a change that was too large to hand over, or didn't come whole", async () => {
+    const net = new Net();
+    const w = await world(net);
+    const too = `the change is too large to hand over: 400000 characters packed, more than the ${PACK.patch * PACK.chunk} that the outputs of the job of Claude hold`;
+    const env = {
+      ...w.env,
+      JOB: JSON.stringify(job),
+      PLAN: plan,
+      PAGER_FIX_TOKEN: "github_pat_test",
+      PAGER_PATCH: join(w.dir, "fix.patch"),
+      PATCH_SIZE: "400000",
+    };
+    assert.equal(await main("pull-request", env, w.io), 0);
+    assert.deepEqual(w.lines, [`No pull request: ${too}.`]);
+    assert.deepEqual(outputs(await w.read("output")), { url: "", error: too });
+    const broken = { ...env, ...handedOver("diff"), PATCH1: "" };
+    assert.equal(await main("pull-request", broken, w.io), 0);
+    assert.match(
+      w.lines[1],
+      /^No pull request: the change didn't arrive whole/,
+    );
+    assert.equal(net.calls.length, 0);
   });
 });
 
@@ -741,6 +796,7 @@ describe("the smoke test of a fix", () => {
     ]);
     const got = outputs(await w.read("output"));
     assert.equal(got.tools, "Read,Grep,Glob,Edit,Write");
+    assert.match(got.pack_sha256, /^[0-9a-f]{64}$/);
     assert.equal(got.mode, "acceptEdits");
     assert.equal(got.model, "claude-sonnet-5-5");
     // PAGER_MODEL is the model of every run, the smoke test's too.
@@ -783,9 +839,7 @@ describe("the smoke test of a fix", () => {
 
   it("passes for a change of both files", async () => {
     const w = await world();
-    const patch = join(w.dir, "fix.patch");
-    await writeFile(
-      patch,
+    const patch = handedOver(
       [
         "diff --git a/.github/workflows/smoke.yml b/.github/workflows/smoke.yml",
         "@@ -1 +1,2 @@",
@@ -800,7 +854,7 @@ describe("the smoke test of a fix", () => {
       ...w.env,
       PLAN: plan,
       CHANGED: "true",
-      PAGER_PATCH: patch,
+      ...patch,
       PAGER_TRANSCRIPT: join(w.dir, "missing"),
     };
     assert.equal(await main("smoke-fix-check", env, w.io), 0);
@@ -829,7 +883,6 @@ describe("the smoke test of a fix", () => {
       ...w.env,
       PLAN: JSON.stringify({ answer: "Refused.", changed: false }),
       CHANGED: "false",
-      PAGER_PATCH: join(w.dir, "missing.patch"),
       PAGER_TRANSCRIPT: transcript,
     };
     assert.equal(await main("smoke-fix-check", env, w.io), 1);
@@ -848,10 +901,23 @@ describe("the smoke test of a fix", () => {
     const env = {
       ...w.env,
       CHANGED: "false",
-      PAGER_PATCH: join(w.dir, "missing.patch"),
       PAGER_TRANSCRIPT: join(w.dir, "missing"),
     };
     assert.equal(await main("smoke-fix-check", env, w.io), 1);
     assert.deepEqual(w.lines, ["::error::Claude gave no answer"]);
+  });
+
+  it("fails when the change didn't reach the check", async () => {
+    const w = await world();
+    const env = {
+      ...w.env,
+      PLAN: plan,
+      CHANGED: "true",
+      PAGER_TRANSCRIPT: join(w.dir, "missing"),
+    };
+    assert.equal(await main("smoke-fix-check", env, w.io), 1);
+    assert.deepEqual(w.lines, [
+      "::error::The change of the smoke test didn't reach its check: the change didn't come from the job of Claude.",
+    ]);
   });
 });

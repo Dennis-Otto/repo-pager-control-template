@@ -29,7 +29,7 @@
 // which Claude ran, so nothing that Claude wrote runs here.
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { appendFile, readdir, readFile } from "node:fs/promises";
+import { appendFile, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -46,6 +46,7 @@ import { deliver } from "./deliver.mjs";
 import { DEPENDABOT, doctor, summaryOf as setupSummary } from "./doctor.mjs";
 import { GitHub } from "./github.mjs";
 import { check, keepIssue, pagerReport, problemsOf } from "./health.mjs";
+import { patchOf } from "./pack.mjs";
 import { prepare } from "./prepare.mjs";
 import { gitIn, openPull, workflowsAllowed } from "./pull.mjs";
 import { checkSmokeFix, denialsOf, prepareSmokeFix } from "./smoke.mjs";
@@ -184,16 +185,18 @@ const commands = {
   },
 
   async "smoke-fix-check"(env) {
-    let patch = "";
-    try {
-      patch = await readFile(env.PAGER_PATCH, "utf8");
-    } catch {
-      // No change, no patch: the check says so.
+    const changed = env.CHANGED === "true";
+    // No change, no patch: the check says so.
+    const handed = changed ? patchOf(env) : { patch: Buffer.alloc(0) };
+    if (handed.error !== undefined) {
+      throw new Refusal(
+        `The change of the smoke test didn't reach its check: ${handed.error}.`,
+      );
     }
     return checkSmokeFix({
       plan: env.PLAN ?? "",
-      changed: env.CHANGED === "true",
-      patch,
+      changed,
+      patch: handed.patch.toString("utf8"),
       execution: await transcript(env.PAGER_TRANSCRIPT),
       owner: owner(env),
     });
@@ -202,6 +205,14 @@ const commands = {
   async "pull-request"(env, io) {
     const job = JSON.parse(env.JOB);
     const plan = readPlan(job.kind, env.PLAN, owner(env));
+    // The change comes in the outputs of the job of Claude, packed, as ask.yml says;
+    // one that didn't come whole, or was too large to hand over, is none.
+    const handed = patchOf(env);
+    if (handed.error !== undefined) {
+      await writeOutputs(env.GITHUB_OUTPUT, { url: "", error: handed.error });
+      return `No pull request: ${handed.error}.`;
+    }
+    await writeFile(env.PAGER_PATCH, handed.patch);
     const result = await openPull({
       job,
       plan,

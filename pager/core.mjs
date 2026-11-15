@@ -692,6 +692,7 @@ export function schema(kind, count = 0) {
       },
       title: {
         type: "string",
+        maxLength: 256,
         description:
           "The title of the pull request, a Conventional Commit such as fix(ci): ...",
       },
