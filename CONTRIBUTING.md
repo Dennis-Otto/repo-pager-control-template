@@ -25,6 +25,8 @@ npm run diagrams  # without Docker: no ```mermaid block, and a source and both p
 
 A change of behaviour comes with its tests in `test/`, and a bug fix with a test that fails without the fix: the tests run the jobs against a simulated GitHub and a simulated pager in `test/fake.mjs`, never a real one. A change of what a workflow promises, such as its permissions, changes `test/workflows.test.mjs` with it, and the README says what changes for the owner of a copy.
 
+Every copy runs these tests too, without the files of `own`: a test of a file that the template alone has, such as the social preview, or of the template's own policy, asks first, with `IN_TEMPLATE` of `test/where.mjs` and `existsSync()`. `test/copy.test.mjs` makes a copy as the workflow *Template* does, with the code of `pager/template.mjs`, and runs `npm test` in it, so a test that forgets to ask fails here, not in every copy.
+
 ## Where the runs of Claude are tested
 
 Never here. The smoke tests, [Smoke test](.github/workflows/smoke.yml), [of a translation](.github/workflows/smoke-translate.yml) and [of a fix](.github/workflows/smoke-fix.yml), run Claude Code with the subscription of the owner of a control repository, so they skip this template, which has no token of Claude. They run in a pull request of a copy that changes the jobs of Claude: the pull request of its workflow *Template* that brings your change, or a pull request of your own in your own copy, made before the one here. Say in your pull request which copy ran them, and whether they passed, without its log.
