@@ -9,6 +9,12 @@ name: Tests
 # ```mermaid block in the Markdown, both pictures of every source that a page shows
 # and a source for every picture. It doesn't see a picture that is older than its
 # source, so draw the pictures anew after a change of one: bash scripts/diagrams.sh.
+# The actions that the Actions policy allows run actions of their own, which GitHub
+# checks against the policy as well: the step that checks them reads the action.yml
+# of each allowed action at the commit that a workflow pins, with the token of the
+# workflow, and fails on an action that the list of pager/actions.mjs misses, such as
+# one that a new release of anthropics/claude-code-action brings in a pull request of
+# Dependabot.
 
 on:
   pull_request:
@@ -37,6 +43,11 @@ jobs:
           node-version-file: .nvmrc
       - name: Tests
         run: npm test
+      - name: Check the actions that the allowed actions run
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node pager/job.mjs actions
       - name: Check the diagrams
         if: ${{ !cancelled() }}
         run: npm run diagrams

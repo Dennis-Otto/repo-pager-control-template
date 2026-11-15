@@ -19,6 +19,9 @@
 //   node pager/job.mjs access         check that the token of the workflow reads
 //                                     the log of a job and the discussions of a
 //                                     public repository (smoke.yml)
+//   node pager/job.mjs actions        check that the Actions policy allows each
+//                                     action that an allowed action runs itself
+//                                     (test.yml)
 //   node pager/job.mjs smoke-fix      collect the task of the smoke test of a fix
 //   node pager/job.mjs smoke-fix-check
 //                                     check that it changed a workflow and a
@@ -34,6 +37,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { checkAccess, SMOKE_REPOSITORY } from "./access.mjs";
+import { checkActions } from "./actions.mjs";
 import { relay } from "./agents.mjs";
 import {
   answerBody,
@@ -171,6 +175,19 @@ const commands = {
     return checkAccess({
       api: new GitHub(env.GH_TOKEN, io.fetch),
       repo: env.PAGER_SMOKE_REPOSITORY || SMOKE_REPOSITORY,
+    });
+  },
+
+  async actions(env, io) {
+    const folder = join(HERE, "..", ".github", "workflows");
+    const names = (await readdir(folder)).filter((name) =>
+      /\.ya?ml$/.test(name),
+    );
+    return checkActions({
+      api: new GitHub(env.GH_TOKEN, io.fetch),
+      workflows: await Promise.all(
+        names.map((name) => readFile(join(folder, name), "utf8")),
+      ),
     });
   },
 
@@ -507,7 +524,7 @@ export async function main(command, env, io) {
     io.log(
       annotation(
         "error",
-        `Unknown command ${command}: prepare, access, smoke-fix, smoke-fix-check, pull-request, answer, forward, health, health-issue, doctor or template.`,
+        `Unknown command ${command}: prepare, access, actions, smoke-fix, smoke-fix-check, pull-request, answer, forward, health, health-issue, doctor or template.`,
       ),
     );
     return 2;

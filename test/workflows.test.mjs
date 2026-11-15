@@ -1,7 +1,8 @@
 // The promises of the README about the workflows, which the settings of the template
-// enforce on GitHub as well: only GitHub's own actions and anthropics/claude-code-action
-// run, each pinned to a commit (the Actions policy of selected actions with required SHA
-// pinning), every job gets contents: read at most, and the three exceptions: the
+// enforce on GitHub as well: only GitHub's own actions and those of ALLOWED of
+// pager/actions.mjs run, anthropics/claude-code-action and the oven-sh/setup-bun that
+// it runs, each pinned to a commit (the Actions policy of selected actions with
+// required SHA pinning, whose commands the README gives twice), every job gets contents: read at most, and the three exceptions: the
 // workflow Dependabot merges only a pull request of Dependabot, in the template alone,
 // the workflow Health keeps one issue of a failed check, the job prepare of the
 // workflow Pager reads today's runs of its own workflow for PAGER_DAILY_RUNS, and the
@@ -11,6 +12,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
+import { ALLOWED, usesOf } from "../pager/actions.mjs";
 import { PACK } from "../pager/pack.mjs";
 import { BY_ITSELF } from "../pager/prepare.mjs";
 import { WAIT } from "../pager/template.mjs";
@@ -34,9 +36,6 @@ const TEMPLATE_PERMISSIONS = [
   "checks: read",
   "pull-requests: read",
 ];
-// The actions that the Actions policy of the template allows besides GitHub's own.
-const ALLOWED = ["anthropics/claude-code-action"];
-
 function read(path) {
   return readFileSync(join(ROOT, path), "utf8");
 }
@@ -44,13 +43,6 @@ function read(path) {
 const workflows = readdirSync(join(ROOT, WORKFLOWS))
   .filter((name) => /\.ya?ml$/.test(name))
   .map((name) => ({ name, text: read(`${WORKFLOWS}/${name}`) }));
-
-/** Each `uses:` of a text that runs an action or a workflow of another repository. */
-function usesOf(text) {
-  return [...text.matchAll(/^\s*(?:-\s+)?uses:\s*(\S+)/gm)]
-    .map(([, target]) => target)
-    .filter((target) => !target.startsWith("./"));
-}
 
 // As in test/pins.test.mjs: the template, not a control repository, which may add
 // workflows of its own and sets its own policy.
@@ -75,8 +67,44 @@ describe("the workflows of the template", {
     assert.deepEqual(
       refused,
       [],
-      "pin the action to a commit, or add it to ALLOWED here, to the README and to the Actions policy of the template",
+      "pin the action to a commit, or add it to ALLOWED of pager/actions.mjs, to the README and to the Actions policy of the template",
     );
+  });
+
+  it("are allowed by both pairs of commands of the README, the same for a copy and for the template", () => {
+    const commands = [
+      ...read("README.md").matchAll(
+        /^\s*gh api -X PUT "repos\/\$(?:CONTROL|REPO)\/actions\/permissions(.*)$/gm,
+      ),
+    ].map(([, rest]) => rest.trim());
+    assert.equal(commands.length, 4, "a copy's pair and the template's pair");
+    assert.deepEqual(commands.slice(0, 2), commands.slice(2));
+    assert.deepEqual(commands[0].split(/\s+-/).slice(1), [
+      "F enabled=true",
+      "f allowed_actions=selected",
+      "F sha_pinning_required=true",
+    ]);
+    assert.deepEqual(
+      [...commands[1].matchAll(/-f "patterns_allowed\[\]=([^"]+)"/g)].map(
+        ([, pattern]) => pattern,
+      ),
+      ALLOWED.map((action) => `${action}@*`),
+    );
+    assert.match(
+      commands[1],
+      /-F github_owned_allowed=true -F verified_allowed=false/,
+    );
+  });
+
+  it("have the README and SECURITY.md name every action of the list", () => {
+    for (const path of ["README.md", "SECURITY.md"]) {
+      for (const action of ALLOWED) {
+        assert.ok(
+          read(path).includes(`\`${action}\``),
+          `${path} names ${action}`,
+        );
+      }
+    }
   });
 
   it("start with no permissions and give a job contents: read at most", () => {
